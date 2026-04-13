@@ -39,16 +39,16 @@
   .field input,.field select{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:9px 12px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .15s}
   .field input:focus,.field select:focus{border-color:var(--accent)}
   .field select option{background:var(--surface2)}
-  .express-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px}
-  .express-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);white-space:nowrap}
+  .xp-panel{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px}
+  .xp-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text3);white-space:nowrap}
   .xp-btn{font-family:var(--mono);font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text3);cursor:pointer;transition:all .15s}
   .xp-btn:hover{border-color:var(--text2);color:var(--text2)}
-  .xp-btn.active{border-color:var(--accent2);color:var(--accent2);background:rgba(240,160,74,.1)}
-  .xp-divider{display:none;align-items:center;gap:6px}
-  .xp-divider.show{display:flex}
-  .xp-divider input{width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 8px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;text-align:center}
-  .xp-divider input:focus{border-color:var(--accent2)}
-  .xp-divider span{font-family:var(--mono);font-size:11px;color:var(--text3)}
+  .xp-btn.on{border-color:var(--accent2);color:var(--accent2);background:rgba(240,160,74,.1)}
+  .xp-extra{display:none;align-items:center;gap:6px}
+  .xp-extra.show{display:flex}
+  .xp-extra input{width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 8px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;text-align:center}
+  .xp-extra input:focus{border-color:var(--accent2)}
+  .xp-extra span{font-family:var(--mono);font-size:11px;color:var(--text3)}
   .btn{background:var(--accent);color:var(--bg);border:none;border-radius:6px;padding:10px 20px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:all .15s;text-transform:uppercase}
   .btn:hover{background:#5ffaad;transform:translateY(-1px)}.btn:active{transform:translateY(0)}
   .btn:disabled{background:var(--border);color:var(--text3);cursor:not-allowed;transform:none}
@@ -79,9 +79,9 @@
   .wave-meta{font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:20px}
   .wave-section{margin-bottom:16px}
   .wave-section-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:2px;padding:6px 0;margin-bottom:8px;border-bottom:1px solid var(--border)}
-  .s7{color:var(--jcrew)}.s9{color:var(--madewell)}.sM{color:var(--danger)}.sX{color:var(--accent2)}
+  .s7{color:var(--jcrew)}.s9{color:var(--madewell)}.sX{color:var(--accent2)}
   .wave-row{display:grid;grid-template-columns:200px 90px 90px 1fr 130px;gap:8px;align-items:center;padding:8px 12px;border-radius:6px;margin-bottom:4px;background:var(--bg);border:1px solid var(--border)}
-  .wave-row.express-row-highlight{border-color:rgba(240,160,74,.3);background:rgba(240,160,74,.04)}
+  .wave-row.xp{border-color:rgba(240,160,74,.3);background:rgba(240,160,74,.03)}
   .wc{font-size:13px;font-weight:500;color:var(--text)}
   .wo{font-family:var(--mono);color:var(--accent);font-size:14px;text-align:right}
   .wu{font-family:var(--mono);color:var(--text2);font-size:12px;text-align:right}
@@ -90,16 +90,14 @@
   .wp7{background:rgba(74,159,240,.15);color:var(--jcrew);border:1px solid rgba(74,159,240,.3)}
   .wp9{background:rgba(196,122,240,.15);color:var(--madewell);border:1px solid rgba(196,122,240,.3)}
   .wpX{background:rgba(240,160,74,.12);color:var(--accent2);border:1px solid rgba(240,160,74,.3)}
-  .wpM{background:rgba(240,90,74,.1);color:var(--danger);border:1px solid rgba(240,90,74,.25)}
   .totals-bar{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px}
   .ti .tl{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
   .ti .tv{font-family:var(--mono);font-size:18px;font-weight:500;color:var(--accent)}
   .ti.warn .tv{color:var(--accent2)}.ti.danger .tv{color:var(--danger)}
   .copy-area{margin-top:14px;display:flex;gap:8px;align-items:center}
   .copy-ok{font-family:var(--mono);font-size:11px;color:var(--accent);display:none}
-  .warn-list{margin-top:12px;padding:10px 14px;background:rgba(240,90,74,.06);border:1px solid rgba(240,90,74,.2);border-radius:6px;font-family:var(--mono);font-size:11px;color:var(--danger)}
-  .warn-list ul{margin-top:6px;padding-left:16px}
-  .warn-list li{margin-bottom:2px}
+  .warn-box{margin-top:12px;padding:10px 14px;background:rgba(240,90,74,.06);border:1px solid rgba(240,90,74,.2);border-radius:6px;font-family:var(--mono);font-size:11px;color:var(--danger)}
+  .warn-box ul{margin-top:6px;padding-left:16px}.warn-box li{margin-bottom:2px}
   .pod-toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
   .pod-upload-zone{border:1.5px dashed var(--border);border-radius:6px;padding:8px 14px;cursor:pointer;transition:all .2s;position:relative;display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--text3)}
   .pod-upload-zone:hover{border-color:var(--accent);color:var(--accent)}
@@ -115,11 +113,11 @@
   .pod-toggle.on{background:rgba(74,240,160,.25)}.pod-toggle.on::after{left:18px;background:var(--accent)}
   .pod-meta{font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:6px}
   .pod-meta span{color:var(--text2)}
-  .pod-cap-override{display:flex;align-items:center;gap:6px;margin-bottom:8px}
-  .pod-cap-override label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;white-space:nowrap}
-  .pod-cap-override input{width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 8px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none}
-  .pod-cap-override input:focus{border-color:var(--accent)}
-  .pod-cap-override span{font-family:var(--mono);font-size:10px;color:var(--text3)}
+  .pod-cap-row{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+  .pod-cap-row label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;white-space:nowrap}
+  .pod-cap-row input{width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 8px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none}
+  .pod-cap-row input:focus{border-color:var(--accent)}
+  .pod-cap-row span{font-family:var(--mono);font-size:10px;color:var(--text3)}
   .pod-brand-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;align-items:center}
   .pod-brand-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-right:2px;white-space:nowrap}
   .brand-btn{font-family:var(--mono);font-size:10px;padding:3px 9px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text3);cursor:pointer;transition:all .15s;white-space:nowrap}
@@ -129,8 +127,7 @@
   .brand-btn.sel-both{border-color:var(--accent2);color:var(--accent2);background:rgba(240,160,74,.1)}
   .brand-btn.sel-apo{border-color:var(--apo);color:var(--apo);background:rgba(74,240,160,.1)}
   .criteria-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;min-height:22px}
-  .ctag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:3px;display:inline-flex;align-items:center;gap:4px}
-  .ctagN{background:rgba(255,255,255,.06);color:var(--text2);border:1px solid var(--border)}
+  .ctag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:3px;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.06);color:var(--text2);border:1px solid var(--border)}
   .ctag-x{cursor:pointer;opacity:.5;font-size:12px;line-height:1;margin-left:2px}
   .ctag-x:hover{opacity:1;color:var(--danger)}
   .add-criteria-row{display:flex;gap:6px}
@@ -188,7 +185,6 @@
         <div class="summary-grid" id="summary-stats"></div>
       </div>
     </div>
-
     <div class="panel">
       <div class="panel-title">Wave Setup</div>
       <div class="config-row">
@@ -206,29 +202,27 @@
           <button class="btn" onclick="generateWave()" id="gen-btn" disabled>Generate Wave</button>
         </div>
       </div>
-      <!-- Express Control -->
-      <div class="express-row" style="margin-top:12px">
-        <span class="express-label">Express Mode:</span>
-        <button class="xp-btn active" id="xp-clean" onclick="setXpMode('clean')">Clean Each Wave</button>
-        <button class="xp-btn" id="xp-divide" onclick="setXpMode('divide')">Divide Across Waves</button>
-        <div class="xp-divider" id="xp-divider-row">
+      <div class="xp-panel">
+        <span class="xp-label">Express:</span>
+        <button class="xp-btn on" id="xp-clean" onclick="setXp('clean')">Clean Each Wave</button>
+        <button class="xp-btn" id="xp-div" onclick="setXp('divide')">Divide Across Waves</button>
+        <div class="xp-extra" id="xp-extra">
           <span>Spread over</span>
-          <input type="number" id="xp-waves" value="3" min="1" max="20"/>
+          <input type="number" id="xp-n" value="3" min="1" max="20"/>
           <span>waves</span>
         </div>
       </div>
     </div>
-
-    <div id="wave-output-section" style="display:none">
+    <div id="wave-out" style="display:none">
       <div class="panel">
         <div class="wave-title" id="out-title">WAVE <span>—</span></div>
         <div class="wave-meta" id="out-meta"></div>
         <div id="out-body"></div>
         <div class="totals-bar" id="out-totals"></div>
-        <div id="out-warnings"></div>
+        <div id="out-warns"></div>
         <div class="copy-area">
-          <button class="btn btn-ghost btn-sm" onclick="copyOutput()">Copy for Teams</button>
-          <span class="copy-ok" id="copy-ok">✓ Copied to clipboard</span>
+          <button class="btn btn-ghost btn-sm" onclick="copyOut()">Copy for Teams</button>
+          <span class="copy-ok" id="copy-ok">✓ Copied</span>
         </div>
       </div>
     </div>
@@ -239,17 +233,17 @@
     <div class="panel">
       <div class="panel-title">Pod Manager</div>
       <div class="alert alert-info">
-        Criteria assigned without brand prefix — brand buttons control which brand(s) can run. "Both*" pods: system picks the brand with greater SLA need each wave. Importing CSV only updates capacities — active state and criteria are never changed by import.
+        Criteria assigned without brand prefix. "Both*" pods: system picks the brand with greater SLA-weighted need each wave — brands never mix in the same pod. Importing CSV updates capacities only — active state and criteria are never changed.
       </div>
       <div class="pod-toolbar">
         <div class="pod-upload-zone">
-          <input type="file" accept=".csv" onchange="loadChuteCapacities(event)"/>
+          <input type="file" accept=".csv" onchange="loadCaps(event)"/>
           ⬆ Import Chute-Capacities CSV (caps only)
         </div>
         <button class="btn btn-ghost btn-sm" onclick="setAllActive(true)">All Active</button>
         <button class="btn btn-ghost btn-sm" onclick="setAllActive(false)">All Inactive</button>
-        <button class="btn btn-danger btn-sm" onclick="confirmReset()">Reset All</button>
-        <span id="pod-save-status" style="font-family:var(--mono);font-size:11px;color:var(--accent);display:none">✓ Saved</span>
+        <button class="btn btn-danger btn-sm" onclick="confirmReset()">Reset to Defaults</button>
+        <span id="save-ok" style="font-family:var(--mono);font-size:11px;color:var(--accent);display:none">✓ Saved</span>
       </div>
       <div class="pod-grid" id="pod-grid"></div>
     </div>
@@ -259,21 +253,20 @@
   <div id="tab-pool" style="display:none">
     <div class="panel">
       <div class="panel-title">Full Pool — Orders by Criteria &amp; Date</div>
-      <div id="pool-table-body">
+      <div id="pool-tbl">
         <div class="empty-state"><div class="icon">📦</div><p>Upload both CSVs on the Wave Planner tab to see the full pool here.</p></div>
       </div>
     </div>
   </div>
-
 </div>
 
 <div class="modal-overlay" id="reset-modal">
   <div class="modal">
-    <div class="modal-title">Reset All Pod Settings?</div>
-    <p style="font-size:13px;color:var(--text2);line-height:1.6">This clears all criteria and brand settings. Capacities from CSV import are kept. Active/inactive states are reset to default.</p>
+    <div class="modal-title">Reset to Default Pod Setup?</div>
+    <p style="font-size:13px;color:var(--text2);line-height:1.6">This restores the default criteria and brand assignments for all pods. Any custom changes you've made will be lost. Capacities from CSV import are kept.</p>
     <div class="modal-actions">
       <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-danger btn-sm" onclick="resetPods()">Reset</button>
+      <button class="btn btn-danger btn-sm" onclick="resetPods()">Reset to Defaults</button>
     </div>
   </div>
 </div>
@@ -286,54 +279,129 @@ const BASE_CRITERIA = [
   'OFFLINE1','OFFLINE5','OVNC','OVNC1','QC','SHOES','STND',
 ];
 
-// Express criteria bases — handled separately
 const EXPRESS_BASES = new Set(['EXPRESS1','EXPRESS','EXOFFLINE']);
 
-// Minimum orders before a pod assignment is worthwhile
-const MIN_POD_ORDERS = 10;
+// Minimum orders to bother opening a new pod slot
+const MIN_POD_FILL = 10;
 
-// SLA priority (higher = first)
-const PRIORITY = {
+// SLA priority
+const PRI = {
   'EXPRESS1':100,'EXPRESS':90,'EXOFFLINE':85,'OVNC1':80,
   'OFFLINE1':70,'GOH1':65,'SHOES':60,'OFFLINE5':55,'10PLUS':50,
   'OFFLINE':45,'STND':40,'ESW':35,'GIFTMSG':35,'GOH':35,'OVNC':35,
   'NORD':32,'APO':30,'MONO':25,'GIFTBOX':20,'QC':10,
 };
 
+// ── DEFAULT POD SETUP (from your actual floor config) ────────────────
+// brand: '7'=JCrew only, '9'=Madewell only, 'both'=system decides, 'apo'=APO mix
+// criteria: base names without brand prefix
+// active: whether this pod is on by default
+// capOverride: working order cap (null = use physical cap from CSV)
+const DEFAULT_POD_SETUP = {
+  // LINE 1 — J.Crew OFFLINE1 (Kindred)
+  POD01:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE1']},
+  POD02:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE1']},
+  POD03:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE1']},
+  POD04:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE1']},  // Singles
+  // Line 1 offline/stnd
+  POD05:{brand:'9', active:true,  capOverride:null, criteria:['EXOFFLINE','OFFLINE','OFFLINE5','STND']},
+  POD06:{brand:'9', active:true,  capOverride:null, criteria:['OFFLINE','OFFLINE5','STND']},
+  POD07:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE','OFFLINE5','STND']},
+  POD08:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE','OFFLINE5','STND']},
+  POD09:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE1']},  // Singles
+  POD10:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE','OFFLINE5','STND']},
+  POD11:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE','OFFLINE5','STND']},
+  POD12:{brand:'9', active:true,  capOverride:null, criteria:['EXPRESS1','OFFLINE1']}, // Singles + 9-EXPRESS1
+  // LINE 2 — APO, Smalls, Manuals (Lightning Pick)
+  POD13:{brand:'7', active:false, capOverride:null, criteria:[]},
+  POD14:{brand:'7', active:false, capOverride:null, criteria:[]},
+  POD15:{brand:'apo',active:true, capOverride:null, criteria:['APO']},
+  POD16:{brand:'7', active:true,  capOverride:null, criteria:['ESW','GIFTMSG','GOH','OVNC']},
+  POD17:{brand:'7', active:true,  capOverride:null, criteria:['ESW','GIFTMSG','GOH','OVNC']},
+  POD18:{brand:'7', active:true,  capOverride:null, criteria:['ESW','EXPRESS','GIFTMSG','GOH','OVNC']},
+  POD19:{brand:'7', active:true,  capOverride:null, criteria:['ESW','GIFTMSG','GOH','OVNC']},
+  POD20:{brand:'7', active:true,  capOverride:null, criteria:['NORD']},
+  POD21:{brand:'7', active:false, capOverride:null, criteria:['GOH1']},
+  POD22:{brand:'7', active:false, capOverride:null, criteria:['GOH1']},
+  POD23:{brand:'7', active:false, capOverride:null, criteria:['GOH1']},
+  POD24:{brand:'7', active:false, capOverride:null, criteria:['GOH1']},
+  // LINE 3 — J.Crew Express + Offline (Kindred)
+  POD25:{brand:'7', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS','OFFLINE','OFFLINE5','STND']},
+  POD26:{brand:'7', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS','OFFLINE','OFFLINE5','STND']},
+  POD27:{brand:'7', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS','OFFLINE','OFFLINE5','STND']},
+  POD28:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE1']},
+  POD29:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE','OFFLINE5','STND']},
+  POD30:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE','OFFLINE5','STND']},
+  POD31:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE1']},
+  POD32:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE','OFFLINE5','STND']},
+  POD33:{brand:'7', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS','OFFLINE','OFFLINE5','STND']},
+  POD34:{brand:'7', active:true,  capOverride:null, criteria:['OFFLINE','OFFLINE5','STND']},
+  POD35:{brand:'7', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS','OFFLINE','OFFLINE5','STND']},
+  POD36:{brand:'7', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS','OFFLINE','OFFLINE5','STND']},
+  // LINE 4 — Madewell Express + Smalls (Lightning Pick)
+  POD37:{brand:'9', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS']},
+  POD38:{brand:'9', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS']},
+  POD39:{brand:'9', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS']},
+  POD40:{brand:'9', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS']},
+  POD41:{brand:'9', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS']},
+  POD42:{brand:'9', active:true,  capOverride:null, criteria:['EXOFFLINE','EXPRESS']},
+  POD43:{brand:'9', active:true,  capOverride:null, criteria:['10PLUS','ESW','GIFTMSG','GOH','OVNC','STND']},
+  POD44:{brand:'9', active:true,  capOverride:null, criteria:['10PLUS','ESW','GIFTMSG','GOH','OVNC','STND']},
+  POD45:{brand:'9', active:true,  capOverride:null, criteria:['10PLUS','ESW','GIFTMSG','GOH','OVNC','STND']},
+  POD46:{brand:'9', active:true,  capOverride:null, criteria:['10PLUS','ESW','GIFTMSG','GOH','OVNC','STND']},
+  POD47:{brand:'9', active:true,  capOverride:null, criteria:['10PLUS','ESW','GIFTMSG','GOH','OVNC','STND']},
+  POD48:{brand:'9', active:true,  capOverride:null, criteria:['10PLUS','ESW','GIFTMSG','GOH','OVNC','STND']},
+};
+
+// POD 3 is J.Crew 10PLUS only
+DEFAULT_POD_SETUP['POD03'].criteria = ['10PLUS','OFFLINE1'];
+DEFAULT_POD_SETUP['POD03'].capOverride = 85;
+
 // ── STATE ────────────────────────────────────────────────────────────
 let ordersPool=null, unitsPool=null, allDates=[], podConfig={};
-let xpMode='clean'; // 'clean' or 'divide'
+let xpMode='clean';
 
-function defaultPodConfig() {
+function buildDefaultConfig() {
   const cfg={};
   for(let i=1;i<=48;i++){
     const p='POD'+String(i).padStart(2,'0');
-    cfg[p]={active:false,line:null,sorter:null,orders:0,units:0,capOverride:null,brand:'7',criteria:[]};
+    const def=DEFAULT_POD_SETUP[p]||{};
+    cfg[p]={
+      active: def.active??false,
+      line: null, sorter: null, orders: 0, units: 0,
+      capOverride: def.capOverride??null,
+      brand: def.brand||'7',
+      criteria: [...(def.criteria||[])],
+    };
   }
   return cfg;
 }
+
 function loadPodConfig(){
-  try{const s=localStorage.getItem('wplanner_v4');if(s){podConfig=JSON.parse(s);return;}}catch(e){}
-  podConfig=defaultPodConfig();
+  try{
+    const s=localStorage.getItem('wplanner_v5');
+    if(s){podConfig=JSON.parse(s);return;}
+  }catch(e){}
+  podConfig=buildDefaultConfig();
 }
 function savePodConfig(){
-  try{localStorage.setItem('wplanner_v4',JSON.stringify(podConfig));}catch(e){}
-  const el=document.getElementById('pod-save-status');
+  try{localStorage.setItem('wplanner_v5',JSON.stringify(podConfig));}catch(e){}
+  const el=document.getElementById('save-ok');
   if(el){el.style.display='inline';setTimeout(()=>el.style.display='none',1500);}
 }
 loadPodConfig();
 
 // ── EXPRESS MODE ─────────────────────────────────────────────────────
-function setXpMode(mode){
+function setXp(mode){
   xpMode=mode;
-  document.getElementById('xp-clean').className='xp-btn'+(mode==='clean'?' active':'');
-  document.getElementById('xp-divide').className='xp-btn'+(mode==='divide'?' active':'');
-  document.getElementById('xp-divider-row').className='xp-divider'+(mode==='divide'?' show':'');
+  document.getElementById('xp-clean').className='xp-btn'+(mode==='clean'?' on':'');
+  document.getElementById('xp-div').className='xp-btn'+(mode==='divide'?' on':'');
+  document.getElementById('xp-extra').className='xp-extra'+(mode==='divide'?' show':'');
 }
 
 // ── CSV PARSING ──────────────────────────────────────────────────────
 function parseLine(line){
-  const r=[]; let cur='',q=false;
+  const r=[];let cur='',q=false;
   for(const c of line){if(c==='"'){q=!q;continue}if(c===','&&!q){r.push(cur);cur='';continue}cur+=c;}
   r.push(cur);return r;
 }
@@ -369,7 +437,7 @@ function parseChuteCSV(text){
     const sorter=cols[s2i]?.trim()||'';
     const o=parseInt(cols[oi])||0,u=parseInt(cols[ui])||0;
     if(!pods[pod]) pods[pod]={line,sorter,orders:0,units:0};
-    pods[pod].orders+=o; pods[pod].units+=u;
+    pods[pod].orders+=o;pods[pod].units+=u;
     if(line) pods[pod].line=line;
   }
   return pods;
@@ -398,16 +466,15 @@ function loadPool(e,type){
   };
   reader.readAsText(file);
 }
-
-function loadChuteCapacities(e){
+function loadCaps(e){
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=ev=>{
     const caps=parseChuteCSV(ev.target.result);
     let n=0;
     Object.entries(caps).forEach(([pod,data])=>{
-      if(!podConfig[pod]) return; // Don't create new pods from import
-      // ONLY update capacities — never touch active, brand, or criteria
+      if(!podConfig[pod]) return;
+      // CAPS ONLY — never touch active, brand, criteria
       podConfig[pod].line=data.line;
       podConfig[pod].sorter=data.sorter;
       podConfig[pod].orders=data.orders;
@@ -415,7 +482,7 @@ function loadChuteCapacities(e){
       n++;
     });
     savePodConfig();buildPodGrid();
-    alert(`✓ Capacities updated for ${n} pods.\nActive/inactive states and criteria assignments were not changed.`);
+    alert(`✓ Capacities updated for ${n} pods.\nActive state, brands, and criteria were not changed.`);
   };
   reader.readAsText(file);
 }
@@ -439,7 +506,7 @@ function buildPoolTable(){
   const cols=allDates.slice(0,8);
   const criteria=Object.keys(ordersPool).sort((a,b)=>{
     const sa=a.replace(/^[79]-/,''),sb=b.replace(/^[79]-/,'');
-    return (PRIORITY[sb]||0)-(PRIORITY[sa]||0)||a.localeCompare(b);
+    return (PRI[sb]||0)-(PRI[sa]||0)||a.localeCompare(b);
   });
   let html=`<div class="table-wrap"><table><thead><tr><th>Criteria</th>${cols.map(d=>`<th>${fmtDate(d)}</th>`).join('')}<th>Total Ord</th><th>Total Units</th><th>PPO</th></tr></thead><tbody>`;
   let gO=0,gU=0;
@@ -454,7 +521,7 @@ function buildPoolTable(){
   });
   html+=`<tr class="total-row"><td>TOTAL</td>${cols.map(d=>{const v=Object.values(ordersPool).reduce((s,c)=>s+(c[d]||0),0);return `<td>${v?v.toLocaleString():'—'}</td>`;}).join('')}<td>${gO.toLocaleString()}</td><td>${gU.toLocaleString()}</td><td>${gO>0?(gU/gO).toFixed(1):'—'}</td></tr>`;
   html+='</tbody></table></div>';
-  document.getElementById('pool-table-body').innerHTML=html;
+  document.getElementById('pool-tbl').innerHTML=html;
 }
 
 // ── WAVE GENERATION ──────────────────────────────────────────────────
@@ -464,155 +531,140 @@ function generateWave(){
   const capU=parseInt(document.getElementById('wave-units').value)||0;
   const brandFilter=document.getElementById('wave-brand').value;
   const daysOut=parseInt(document.getElementById('wave-daysout').value)||4;
-  const xpWaves=parseInt(document.getElementById('xp-waves').value)||3;
+  const xpN=parseInt(document.getElementById('xp-n').value)||3;
   if(!capU){alert('Enter Selection capacity in units.');return;}
 
   const eligDates=allDates.slice(0,daysOut);
 
-  // Decide brand per "both" pod based on SLA-weighted need
-  const podBrandDecision={};
+  // Decide brand for "both" pods based on SLA-weighted pool need
+  const podBrand={};
   Object.entries(podConfig).forEach(([pod,cfg])=>{
     if(!cfg.active||cfg.brand!=='both') return;
     let s7=0,s9=0;
     cfg.criteria.forEach(base=>{
-      const pri=PRIORITY[base]||10;
-      s7+=eligDates.reduce((s,d)=>s+((ordersPool['7-'+base]||{})[d]||0),0)*pri;
-      s9+=eligDates.reduce((s,d)=>s+((ordersPool['9-'+base]||{})[d]||0),0)*pri;
+      const p=PRI[base]||10;
+      s7+=eligDates.reduce((s,d)=>s+((ordersPool['7-'+base]||{})[d]||0),0)*p;
+      s9+=eligDates.reduce((s,d)=>s+((ordersPool['9-'+base]||{})[d]||0),0)*p;
     });
-    podBrandDecision[pod]=s7>=s9?'7':'9';
+    podBrand[pod]=s7>=s9?'7':'9';
   });
 
-  // Build candidate list
+  // Build candidates
   const candidates=[];
   Object.keys(ordersPool).forEach(fullCrit=>{
     const brand=fullCrit.startsWith('9-')?'9':'7';
     const base=fullCrit.replace(/^[79]-/,'');
     if(brandFilter!=='both'&&brand!==brandFilter) return;
-    const isExpress=EXPRESS_BASES.has(base);
+    const isXp=EXPRESS_BASES.has(base);
 
-    let dp=[];
+    // Build date plan: partial dates OK — take only what's needed
+    const dp=[];
     eligDates.forEach(date=>{
       const o=(ordersPool[fullCrit]||{})[date]||0;
       const u=(unitsPool[fullCrit]||{})[date]||0;
-      if(o>0) dp.push({date,orders:o,units:u});
+      if(o>0) dp.push({date,orders:o,units:u,ppo:o>0?u/o:1});
     });
     if(!dp.length) return;
 
     let tO=dp.reduce((s,d)=>s+d.orders,0);
     let tU=dp.reduce((s,d)=>s+d.units,0);
 
-    // Apply express divisor if divide mode
-    if(isExpress&&xpMode==='divide'&&xpWaves>1){
-      tO=Math.ceil(tO/xpWaves);
-      tU=Math.ceil(tU/xpWaves);
-      // Rebuild dp proportionally
-      let left=tO;
-      const newDp=[];
-      for(const d of dp){
-        if(left<=0) break;
-        const take=Math.min(d.orders,left);
-        newDp.push({date:d.date,orders:take,units:Math.round(take*(d.units/d.orders))});
-        left-=take;
-      }
-      dp=newDp;
+    // Express divide mode: scale down proportionally
+    if(isXp&&xpMode==='divide'&&xpN>1){
+      tO=Math.ceil(tO/xpN);
+      tU=Math.ceil(tU/xpN);
     }
 
     const ppo=tO>0?tU/tO:1;
-    const pri=PRIORITY[base]||10;
-    candidates.push({fullCrit,base,brand,dp,tO,tU,ppo,pri,isExpress});
+    const pri=PRI[base]||10;
+    candidates.push({fullCrit,base,brand,dp,tO,tU,ppo,pri,isXp});
   });
 
-  // Sort: express first (by priority), then everything else by priority
+  // Express first, then by priority
   candidates.sort((a,b)=>{
-    if(a.isExpress!==b.isExpress) return a.isExpress?-1:1;
+    if(a.isXp!==b.isXp) return a.isXp?-1:1;
     return b.pri-a.pri;
   });
 
-  // Pod remaining capacity
+  // Pod remaining caps
   const podLeft={};
   Object.entries(podConfig).forEach(([pod,cfg])=>{
     if(cfg.active){
       const capO=cfg.capOverride!=null?cfg.capOverride:cfg.orders;
-      podLeft[pod]={orders:capO,units:cfg.units};
+      podLeft[pod]={orders:capO,units:cfg.units,used:false};
     }
   });
 
-  let unitBudget=capU;
+  let budget=capU;
   const planned=[];
   const warnings=[];
 
   candidates.forEach(cand=>{
-    if(unitBudget<=0) return;
+    if(budget<=0) return;
 
-    // Find eligible pods
+    // Find eligible active pods
     const eligPods=Object.entries(podConfig).filter(([pod,cfg])=>{
       if(!cfg.active||!podLeft[pod]) return false;
       if(!cfg.criteria.includes(cand.base)) return false;
       if(cfg.brand==='apo') return true;
       if(cfg.brand==='7') return cand.brand==='7';
       if(cfg.brand==='9') return cand.brand==='9';
-      if(cfg.brand==='both') return podBrandDecision[pod]===cand.brand;
+      if(cfg.brand==='both') return podBrand[pod]===cand.brand;
       return false;
     });
 
     if(!eligPods.length){
-      // Only warn if there are actual orders to place
-      if(cand.tO>0) warnings.push(`${cand.fullCrit}: ${cand.tO} orders have no active pod assigned`);
+      // Only warn if there are real orders that need a home
+      if(cand.tO>=MIN_POD_FILL){
+        warnings.push(`${cand.fullCrit}: ${cand.tO} orders — no active pod configured`);
+      }
       return;
     }
 
-    // Sort pods: prefer pods that already have criteria assigned (fill before spreading)
-    // Then by remaining capacity descending
+    // Prefer partially-used pods (fill before opening new ones)
     eligPods.sort((a,b)=>{
-      const aUsed=podLeft[a[0]].orders < (a[1].capOverride??a[1].orders); // pod has been used
-      const bUsed=podLeft[b[0]].orders < (b[1].capOverride??b[1].orders);
-      if(aUsed&&!bUsed) return -1; // prefer used pods first (fill them up)
+      const aUsed=podLeft[a[0]].used, bUsed=podLeft[b[0]].used;
+      if(aUsed&&!bUsed) return -1;
       if(!aUsed&&bUsed) return 1;
-      return (podLeft[b[0]]?.orders||0)-(podLeft[a[0]]?.orders||0);
+      return (podLeft[b[0]].orders)-(podLeft[a[0]].orders);
     });
 
     const [podName]=eligPods[0];
     const pLeft=podLeft[podName];
 
-    // Check if worth putting in this pod (min threshold)
-    const maxO=Math.min(cand.tO,pLeft.orders,Math.floor(unitBudget/cand.ppo));
-    if(maxO<MIN_POD_ORDERS&&!cand.isExpress){
-      // Try next pod that has more room
-      const biggerPod=eligPods.find(([p])=>(podLeft[p]?.orders||0)>=MIN_POD_ORDERS);
-      if(!biggerPod){
-        if(maxO>0){
-          // Still plan it, just small
-        } else {
-          if(cand.tO>0) warnings.push(`${cand.fullCrit}: ${cand.tO} orders couldn't fit — pod capacity exhausted`);
-          return;
-        }
-      }
-    }
+    // How many can we take? Partial dates are fine — take only what fits
+    const maxByPod=pLeft.orders;
+    const maxByBudget=Math.floor(budget/cand.ppo);
+    const maxO=Math.min(cand.tO,maxByPod,maxByBudget);
 
     if(maxO<=0){
-      if(cand.tO>0) warnings.push(`${cand.fullCrit}: ${cand.tO} orders couldn't fit — pod capacity exhausted`);
+      if(cand.tO>=MIN_POD_FILL)
+        warnings.push(`${cand.fullCrit}: ${cand.tO} orders couldn't fit — pod at capacity`);
       return;
     }
 
+    // Pull from oldest dates first, taking PARTIAL amounts as needed
+    // We do NOT need to clean a full date — just take what we need
     let left=maxO;
     const datePlan=[];
     for(const d of cand.dp){
       if(left<=0) break;
-      const take=Math.min(d.orders,left);
+      const take=Math.min(d.orders,left); // partial date take is fine
       datePlan.push({date:d.date,orders:take});
       left-=take;
     }
     const actualO=maxO-left;
     const actualU=Math.round(actualO*cand.ppo);
 
-    podLeft[podName].orders=Math.max(0,podLeft[podName].orders-actualO);
-    podLeft[podName].units=Math.max(0,podLeft[podName].units-actualU);
-    unitBudget-=actualU;
+    pLeft.orders=Math.max(0,pLeft.orders-actualO);
+    pLeft.units=Math.max(0,pLeft.units-actualU);
+    pLeft.used=true;
+    budget-=actualU;
 
     planned.push({...cand,plannedO:actualO,plannedU:actualU,dp:datePlan,pod:podName});
   });
 
-  renderOutput(name,capU,planned,unitBudget,warnings);
+  renderOutput(name,capU,planned,budget,warnings);
 }
 
 // ── RENDER OUTPUT ────────────────────────────────────────────────────
@@ -624,14 +676,14 @@ function renderOutput(name,capU,planned,remaining,warnings){
   document.getElementById('out-title').innerHTML=`WAVE <span>${name}</span>`;
   document.getElementById('out-meta').textContent=`Generated ${new Date().toLocaleTimeString()} · ${planned.length} criteria · cap ${capU.toLocaleString()} units`;
 
-  const xpress=planned.filter(p=>p.isExpress);
-  const jc=planned.filter(p=>!p.isExpress&&p.brand==='7');
-  const mw=planned.filter(p=>!p.isExpress&&p.brand==='9');
+  const xp=planned.filter(p=>p.isXp);
+  const jc=planned.filter(p=>!p.isXp&&p.brand==='7');
+  const mw=planned.filter(p=>!p.isXp&&p.brand==='9');
 
   let html='';
-  if(xpress.length) html+=`<div class="wave-section"><div class="wave-section-title sX">● EXPRESS — ${xpMode==='clean'?'CLEAN ALL':'DIVIDED'}</div>${xpress.map(p=>wRow(p)).join('')}</div>`;
-  if(jc.length) html+=`<div class="wave-section"><div class="wave-section-title s7">● J.CREW / FACTORY</div>${jc.map(p=>wRow(p)).join('')}</div>`;
-  if(mw.length) html+=`<div class="wave-section"><div class="wave-section-title s9">● MADEWELL</div>${mw.map(p=>wRow(p)).join('')}</div>`;
+  if(xp.length) html+=`<div class="wave-section"><div class="wave-section-title sX">● EXPRESS — ${xpMode==='clean'?'CLEAN ALL':'DIVIDED ÷'+document.getElementById('xp-n').value}</div>${xp.map(wRow).join('')}</div>`;
+  if(jc.length) html+=`<div class="wave-section"><div class="wave-section-title s7">● J.CREW / FACTORY</div>${jc.map(wRow).join('')}</div>`;
+  if(mw.length) html+=`<div class="wave-section"><div class="wave-section-title s9">● MADEWELL</div>${mw.map(wRow).join('')}</div>`;
   document.getElementById('out-body').innerHTML=html;
 
   const oc=pct>105?'danger':pct<85?'warn':'';
@@ -642,22 +694,20 @@ function renderOutput(name,capU,planned,remaining,warnings){
     <div class="ti ${oc}"><div class="tl">Utilization</div><div class="tv">${pct}%</div></div>
     ${remaining>0?`<div class="ti warn"><div class="tl">Remaining</div><div class="tv">${remaining.toLocaleString()} units</div></div>`:''}`;
 
-  const warnEl=document.getElementById('out-warnings');
-  if(warnings.length){
-    warnEl.innerHTML=`<div class="warn-list">⚠ ${warnings.length} criteria need attention:<ul>${warnings.map(w=>`<li>${w}</li>`).join('')}</ul></div>`;
-  } else {
-    warnEl.innerHTML='';
-  }
+  const wEl=document.getElementById('out-warns');
+  wEl.innerHTML=warnings.length
+    ?`<div class="warn-box">⚠ ${warnings.length} criteria need attention:<ul>${warnings.map(w=>`<li>${w}</li>`).join('')}</ul></div>`
+    :'';
 
-  document.getElementById('wave-output-section').style.display='block';
-  document.getElementById('wave-output-section').scrollIntoView({behavior:'smooth',block:'start'});
+  document.getElementById('wave-out').style.display='block';
+  document.getElementById('wave-out').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function wRow(p){
   const ds=p.dp.map(d=>`${fmtDate(d.date)} (${d.orders})`).join(' → ');
-  const pc=p.isExpress?'wpX':('wp'+p.brand);
-  const rowClass=p.isExpress?'wave-row express-row-highlight':'wave-row';
-  return `<div class="${rowClass}">
+  const pc=p.isXp?'wpX':('wp'+p.brand);
+  const rc=p.isXp?'wave-row xp':'wave-row';
+  return `<div class="${rc}">
     <div class="wc"><span class="brand-dot c${p.brand}"></span>${p.fullCrit}
       <span style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:6px">PPO ${p.ppo.toFixed(1)}</span>
     </div>
@@ -668,7 +718,7 @@ function wRow(p){
   </div>`;
 }
 
-function copyOutput(){
+function copyOut(){
   const name=document.getElementById('wave-name').value||'WAVE';
   const rows=document.querySelectorAll('.wave-row');
   let txt=`WAVE PLAN — ${name} — ${new Date().toLocaleString()}\n${'─'.repeat(72)}\n`;
@@ -676,20 +726,13 @@ function copyOutput(){
   rows.forEach(r=>{
     const cells=r.querySelectorAll('.wc,.wo,.wu,.wd,.wp');
     if(cells.length>=5){
-      const crit=cells[0].textContent.replace(/PPO.*/,'').trim().padEnd(22);
-      const ord=cells[1].textContent.replace(/ord/,'').trim().padStart(8);
-      const u=cells[2].textContent.replace(/units/,'').trim().padStart(8);
-      const pod=cells[4].textContent.trim().padEnd(14);
-      const dates=cells[3].textContent.trim();
-      txt+=`${crit}${ord}  ${u}  ${pod}${dates}\n`;
+      txt+=`${cells[0].textContent.replace(/PPO.*/,'').trim().padEnd(22)}${cells[1].textContent.replace(/ord/,'').trim().padStart(8)}  ${cells[2].textContent.replace(/units/,'').trim().padStart(8)}  ${cells[4].textContent.trim().padEnd(14)}${cells[3].textContent.trim()}\n`;
     }
   });
-  const tot=document.getElementById('out-totals');
-  txt+=`\n${'─'.repeat(72)}\n${tot.innerText.replace(/\n+/g,' | ').trim()}\n`;
+  txt+=`\n${'─'.repeat(72)}\n${document.getElementById('out-totals').innerText.replace(/\n+/g,' | ').trim()}\n`;
   navigator.clipboard.writeText(txt).then(()=>{
     const el=document.getElementById('copy-ok');
-    el.style.display='inline';
-    setTimeout(()=>el.style.display='none',2500);
+    el.style.display='inline';setTimeout(()=>el.style.display='none',2500);
   });
 }
 
@@ -701,23 +744,21 @@ function podCard(pod){
   const cfg=podConfig[pod];
   const on=cfg.active;
   const bClass=cfg.brand==='7'?'b7':cfg.brand==='9'?'b9':cfg.brand==='apo'?'bapo':'bboth';
-  const tags=cfg.criteria.map(base=>`<span class="ctag ctagN">${base}<span class="ctag-x" onclick="removeCrit('${pod}','${base}')">×</span></span>`).join('');
-  const used=new Set(cfg.criteria);
-  const avail=BASE_CRITERIA.filter(c=>!used.has(c));
+  const tags=cfg.criteria.map(b=>`<span class="ctag">${b}<span class="ctag-x" onclick="removeCrit('${pod}','${b}')">×</span></span>`).join('');
+  const avail=BASE_CRITERIA.filter(c=>!cfg.criteria.includes(c));
   const opts=avail.map(c=>`<option value="${c}">${c}</option>`).join('');
   const capO=cfg.capOverride!=null?cfg.capOverride:cfg.orders;
-
   return `<div class="pod-card ${on?'active':'inactive'}" id="pc-${pod}">
     <div class="pod-card-top">
       <div class="pod-id ${bClass}">${pod}</div>
       <button class="pod-toggle ${on?'on':''}" id="pt-${pod}" onclick="togglePod('${pod}')"></button>
     </div>
     <div class="pod-meta">Line <span>${cfg.line||'—'}</span> · <span>${cfg.sorter||'—'}</span> · Physical cap <span>${cfg.orders}</span> ord / <span>${(cfg.units||0).toLocaleString()}</span> units</div>
-    <div class="pod-cap-override">
+    <div class="pod-cap-row">
       <label>Working cap:</label>
-      <input type="number" value="${capO}" min="1" max="${cfg.orders||9999}"
-        onchange="setCapOverride('${pod}',this.value)" title="Set a lower working cap than physical maximum"/>
-      <span>orders max</span>
+      <input type="number" value="${capO}" min="1"
+        onchange="setCapOverride('${pod}',this.value)" title="Override working order cap"/>
+      <span>orders</span>
     </div>
     <div class="pod-brand-row">
       <span class="pod-brand-label">Brand:</span>
@@ -726,14 +767,13 @@ function podCard(pod){
       <button class="brand-btn ${cfg.brand==='both'?'sel-both':''}" onclick="setBrand('${pod}','both')">Both*</button>
       <button class="brand-btn ${cfg.brand==='apo'?'sel-apo':''}" onclick="setBrand('${pod}','apo')">APO</button>
     </div>
-    <div class="criteria-tags" id="tags-${pod}">${tags||'<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">No criteria assigned</span>'}</div>
+    <div class="criteria-tags">${tags||'<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">No criteria assigned</span>'}</div>
     <div class="add-criteria-row">
       <select id="sel-${pod}"><option value="">+ Add criteria...</option>${opts}</select>
       <button class="add-btn" onclick="addCrit('${pod}')">Add</button>
     </div>
   </div>`;
 }
-
 function togglePod(pod){
   podConfig[pod].active=!podConfig[pod].active;savePodConfig();
   const on=podConfig[pod].active;
@@ -742,7 +782,7 @@ function togglePod(pod){
 }
 function setBrand(pod,brand){
   podConfig[pod].brand=brand;savePodConfig();
-  const el=document.getElementById(`pc-${pod}`);if(el) el.outerHTML=podCard(pod);
+  const el=document.getElementById(`pc-${pod}`);if(el)el.outerHTML=podCard(pod);
 }
 function setCapOverride(pod,val){
   const n=parseInt(val);
@@ -751,25 +791,26 @@ function setCapOverride(pod,val){
 }
 function addCrit(pod){
   const sel=document.getElementById(`sel-${pod}`);
-  const val=sel?.value;if(!val) return;
+  const val=sel?.value;if(!val)return;
   if(!podConfig[pod].criteria.includes(val)){
     podConfig[pod].criteria.push(val);
     podConfig[pod].criteria.sort();
     savePodConfig();
-    const el=document.getElementById(`pc-${pod}`);if(el) el.outerHTML=podCard(pod);
+    const el=document.getElementById(`pc-${pod}`);if(el)el.outerHTML=podCard(pod);
   }
 }
 function removeCrit(pod,base){
   podConfig[pod].criteria=podConfig[pod].criteria.filter(c=>c!==base);savePodConfig();
-  const el=document.getElementById(`pc-${pod}`);if(el) el.outerHTML=podCard(pod);
+  const el=document.getElementById(`pc-${pod}`);if(el)el.outerHTML=podCard(pod);
 }
 function setAllActive(val){Object.keys(podConfig).forEach(p=>podConfig[p].active=val);savePodConfig();buildPodGrid();}
 function confirmReset(){document.getElementById('reset-modal').classList.add('open');}
 function closeModal(){document.getElementById('reset-modal').classList.remove('open');}
 function resetPods(){
+  // Keep caps from current config, restore everything else from defaults
   const caps={};
   Object.entries(podConfig).forEach(([p,v])=>caps[p]={line:v.line,sorter:v.sorter,orders:v.orders,units:v.units});
-  podConfig=defaultPodConfig();
+  podConfig=buildDefaultConfig();
   Object.entries(caps).forEach(([p,v])=>Object.assign(podConfig[p],v));
   savePodConfig();closeModal();buildPodGrid();
 }
