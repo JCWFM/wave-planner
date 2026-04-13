@@ -48,7 +48,7 @@
   .xp-extra.show{display:flex}
   .xp-extra input{width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 8px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;text-align:center}
   .xp-extra span{font-family:var(--mono);font-size:11px;color:var(--text3)}
-  .btn{background:var(--accent);color:var(--bg);border:none;border-radius:6px;padding:10px 20px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:all .15s;text-transform:uppercase}
+  .btn{background:var(--accent);color:var(--bg);border:none;border-radius:6px;padding:10px 20px;font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:all .15s;text-transform:uppercase;white-space:nowrap}
   .btn:hover{background:#5ffaad;transform:translateY(-1px)}.btn:active{transform:translateY(0)}
   .btn:disabled{background:var(--border);color:var(--text3);cursor:not-allowed;transform:none}
   .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
@@ -93,7 +93,7 @@
   .ti .tl{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
   .ti .tv{font-family:var(--mono);font-size:18px;font-weight:500;color:var(--accent)}
   .ti.warn .tv{color:var(--accent2)}.ti.danger .tv{color:var(--danger)}
-  .copy-area{margin-top:14px;display:flex;gap:8px;align-items:center}
+  .wave-actions{margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-top:16px;border-top:1px solid var(--border)}
   .copy-ok{font-family:var(--mono);font-size:11px;color:var(--accent);display:none}
   .warn-box{margin-top:12px;padding:10px 14px;background:rgba(240,90,74,.06);border:1px solid rgba(240,90,74,.2);border-radius:6px;font-family:var(--mono);font-size:11px;color:var(--danger)}
   .warn-box ul{margin-top:6px;padding-left:16px}.warn-box li{margin-bottom:2px}
@@ -164,7 +164,7 @@
 
   <!-- PLANNER -->
   <div id="tab-planner">
-    <div class="panel">
+    <div class="panel" id="pool-panel">
       <div class="panel-title">Pool Data</div>
       <div class="upload-row">
         <div class="upload-zone" id="zone-orders">
@@ -184,11 +184,16 @@
         <div class="summary-grid" id="summary-stats"></div>
       </div>
     </div>
+
     <div class="panel">
       <div class="panel-title">Wave Setup</div>
       <div class="config-row">
-        <div class="field"><label>Wave Name</label><input type="text" id="wave-name" placeholder="e.g. 7MULT"/></div>
-        <div class="field"><label>Selection Capacity (Units)</label><input type="number" id="wave-units" placeholder="e.g. 11200"/></div>
+        <div class="field"><label>Wave Name <span style="color:var(--text3)">(optional)</span></label>
+          <input type="text" id="wave-name" placeholder="e.g. 7MULT"/>
+        </div>
+        <div class="field"><label>Selection Capacity (Units)</label>
+          <input type="number" id="wave-units" placeholder="e.g. 11200"/>
+        </div>
         <div class="field"><label>Brand</label>
           <select id="wave-brand">
             <option value="both">Both Brands</option>
@@ -196,7 +201,6 @@
             <option value="9">Madewell (9-)</option>
           </select>
         </div>
-        <div class="field"><label>Days Out (max)</label><input type="number" id="wave-daysout" value="4" min="1" max="10"/></div>
         <div class="field" style="justify-content:flex-end;padding-top:22px">
           <button class="btn" onclick="generateWave()" id="gen-btn" disabled>Generate Wave</button>
         </div>
@@ -212,6 +216,7 @@
         </div>
       </div>
     </div>
+
     <div id="wave-out" style="display:none">
       <div class="panel">
         <div class="wave-title" id="out-title">WAVE <span>—</span></div>
@@ -219,8 +224,9 @@
         <div id="out-body"></div>
         <div class="totals-bar" id="out-totals"></div>
         <div id="out-warns"></div>
-        <div class="copy-area">
+        <div class="wave-actions">
           <button class="btn btn-ghost btn-sm" onclick="copyOut()">Copy for Teams</button>
+          <button class="btn btn-ghost btn-sm" onclick="newWave()">↩ Plan Next Wave</button>
           <span class="copy-ok" id="copy-ok">✓ Copied</span>
         </div>
       </div>
@@ -232,7 +238,7 @@
     <div class="panel">
       <div class="panel-title">Pod Manager</div>
       <div class="alert alert-info">
-        Criteria assigned without brand prefix. "Both*" pods: system picks the brand with greater SLA-weighted need each wave — brands never share a pod in the same wave. Importing CSV updates capacities only — active state, brands, and criteria are never changed by import.
+        Criteria assigned without brand prefix. "Both*" pods: system picks the brand with greater SLA-weighted need each wave — brands never share a pod. CSV import updates capacities only — active state, brands, and criteria are never changed.
       </div>
       <div class="pod-toolbar">
         <div class="pod-upload-zone">
@@ -262,7 +268,7 @@
 <div class="modal-overlay" id="reset-modal">
   <div class="modal">
     <div class="modal-title">Reset to Default Pod Setup?</div>
-    <p style="font-size:13px;color:var(--text2);line-height:1.6">Restores default criteria and brand assignments. Your capacity data (from CSV import) is kept. Any custom changes will be lost.</p>
+    <p style="font-size:13px;color:var(--text2);line-height:1.6">Restores default criteria and brand assignments for all pods. Capacity data from CSV import is kept. Custom changes will be lost.</p>
     <div class="modal-actions">
       <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
       <button class="btn btn-danger btn-sm" onclick="resetPods()">Reset to Defaults</button>
@@ -277,46 +283,48 @@ const BASE_CRITERIA = [
   'GIFTBOX','GIFTMSG','GOH','GOH1','MONO','NORD','OFFLINE',
   'OFFLINE1','OFFLINE5','OVNC','OVNC1','QC','SHOES','STND',
 ];
-
 const EXPRESS_BASES = new Set(['EXPRESS1','EXPRESS','EXOFFLINE']);
-
-const MIN_WARN_ORDERS = 10; // only warn if unrouted orders >= this
-
+const MIN_WARN_ORDERS = 10;
 const PRI = {
   'EXPRESS1':100,'EXPRESS':90,'EXOFFLINE':85,'OVNC1':80,
   'OFFLINE1':70,'GOH1':65,'SHOES':60,'OFFLINE5':55,'10PLUS':50,
   'OFFLINE':45,'STND':40,'ESW':35,'GIFTMSG':35,'GOH':35,'OVNC':35,
   'NORD':32,'APO':30,'MONO':25,'GIFTBOX':20,'QC':10,
 };
-
-// Pod line groupings — used for Line 3 priority logic
-const LINE3_PODS = new Set(['POD25','POD26','POD27','POD29','POD30','POD32','POD33','POD34','POD35','POD36']);
-const LINE1_OVERFLOW_PODS = new Set(['POD01','POD02','POD05','POD06','POD07','POD08','POD10','POD11']);
-const LINE2_PODS = new Set(['POD13','POD14','POD15','POD16','POD17','POD18','POD19','POD20','POD21','POD22','POD23','POD24']);
-
-// ── DEFAULT POD SETUP ────────────────────────────────────────────────
-// Criteria that go everywhere on Line 3 + Line 1 overflow
-const L3L1_CRITERIA = ['EXOFFLINE','EXPRESS','OFFLINE','OFFLINE5','STND'];
-// Criteria for manual (Line 2 Lightning Pick) pods
+// Line 3 pods: preferred for L3L1 criteria before Line 1
+const LINE3 = new Set(['POD25','POD26','POD27','POD29','POD30','POD32','POD33','POD34','POD35','POD36']);
+// Line 1 overflow pods (not singles, not POD03)
+const LINE1_OVF = new Set(['POD01','POD02','POD07','POD08','POD10','POD11']);
+// Criteria that use both Line 3 and Line 1 overflow
+const L3L1 = new Set(['EXOFFLINE','EXPRESS','OFFLINE','OFFLINE5','STND']);
+// Manual criteria (Line 2 + Line 4 smalls)
 const MANUAL_7 = ['APO','ESW','GIFTMSG','GOH','NORD','OVNC'];
 const MANUAL_9 = ['APO','ESW','GIFTMSG','GOH','NORD','OVNC','STND'];
+const L3L1_ARR = ['EXOFFLINE','EXPRESS','OFFLINE','OFFLINE5','STND'];
 
+// ── DEFAULT POD SETUP ────────────────────────────────────────────────
 function buildDefaultPodSetup() {
   return {
     // LINE 1 — Kindred
-    POD01:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD02:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
+    // POD01, 02: J.Crew L3L1 overflow
+    POD01:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD02:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    // POD03: J.Crew 10PLUS only, working cap 85
     POD03:{brand:'7',active:true, capOverride:85,  criteria:['10PLUS']},
-    POD04:{brand:'7',active:true, capOverride:null,criteria:['OFFLINE1']},   // singles
+    // POD04, 09: J.Crew OFFLINE1 singles only
+    POD04:{brand:'7',active:true, capOverride:null,criteria:['OFFLINE1']},
+    // POD05, 06: Madewell OFFLINE/OFFLINE5/STND
     POD05:{brand:'9',active:true, capOverride:null,criteria:['OFFLINE','OFFLINE5','STND']},
     POD06:{brand:'9',active:true, capOverride:null,criteria:['OFFLINE','OFFLINE5','STND']},
-    POD07:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD08:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD09:{brand:'7',active:true, capOverride:null,criteria:['OFFLINE1']},   // singles
-    POD10:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD11:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD12:{brand:'9',active:true, capOverride:null,criteria:['EXPRESS1','OFFLINE1']}, // singles
-    // LINE 2 — Lightning Pick (manuals)
+    // POD07, 08, 10, 11: J.Crew L3L1 overflow
+    POD07:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD08:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD09:{brand:'7',active:true, capOverride:null,criteria:['OFFLINE1']},
+    POD10:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD11:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    // POD12: Madewell EXPRESS1 + OFFLINE1 singles
+    POD12:{brand:'9',active:true, capOverride:null,criteria:['EXPRESS1','OFFLINE1']},
+    // LINE 2 — Lightning Pick (manual pods)
     POD13:{brand:'7',active:false,capOverride:null,criteria:[...MANUAL_7]},
     POD14:{brand:'7',active:false,capOverride:null,criteria:[...MANUAL_7]},
     POD15:{brand:'apo',active:true,capOverride:null,criteria:['APO']},
@@ -329,19 +337,19 @@ function buildDefaultPodSetup() {
     POD22:{brand:'7',active:false,capOverride:null,criteria:['GOH1']},
     POD23:{brand:'7',active:false,capOverride:null,criteria:['GOH1']},
     POD24:{brand:'7',active:false,capOverride:null,criteria:['GOH1']},
-    // LINE 3 — Kindred (preferred over Line 1 for shared criteria)
-    POD25:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD26:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD27:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
+    // LINE 3 — Kindred (priority for L3L1 criteria)
+    POD25:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD26:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD27:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
     POD28:{brand:'7',active:true, capOverride:null,criteria:['OFFLINE1']},
-    POD29:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD30:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
+    POD29:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD30:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
     POD31:{brand:'7',active:true, capOverride:null,criteria:['OFFLINE1']},
-    POD32:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD33:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD34:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD35:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
-    POD36:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_CRITERIA]},
+    POD32:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD33:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD34:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD35:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
+    POD36:{brand:'7',active:true, capOverride:null,criteria:[...L3L1_ARR]},
     // LINE 4 — Lightning Pick (Madewell)
     POD37:{brand:'9',active:true, capOverride:null,criteria:['EXOFFLINE','EXPRESS']},
     POD38:{brand:'9',active:true, capOverride:null,criteria:['EXOFFLINE','EXPRESS']},
@@ -362,38 +370,29 @@ function buildDefaultPodSetup() {
 let ordersPool=null, unitsPool=null, allDates=[], podConfig={};
 let xpMode='clean';
 
-// Load config — MERGE saved data over defaults so caps always persist
 function loadPodConfig() {
   const defaults = buildDefaultPodSetup();
-  // Start with full defaults (all 48 pods with criteria/brand)
+  // Initialize all 48 pods from defaults
   for(let i=1;i<=48;i++){
     const p='POD'+String(i).padStart(2,'0');
-    podConfig[p] = {
-      ...defaults[p],
-      line:null, sorter:null, orders:0, units:0,
-    };
+    podConfig[p] = { ...defaults[p], line:null, sorter:null, orders:0, units:0 };
   }
-  // Overlay saved data — preserving caps AND user customizations
+  // Overlay everything saved — preserves user edits AND caps
   try {
-    const saved = localStorage.getItem('wplanner_v6');
+    const saved = localStorage.getItem('wplanner_v7');
     if(saved) {
       const parsed = JSON.parse(saved);
-      Object.entries(parsed).forEach(([pod, data]) => {
-        if(podConfig[pod]) {
-          // Always restore everything saved — user edits + caps
-          Object.assign(podConfig[pod], data);
-        }
+      Object.entries(parsed).forEach(([pod,data])=>{
+        if(podConfig[pod]) Object.assign(podConfig[pod], data);
       });
     }
-  } catch(e) {}
+  } catch(e){}
 }
-
 function savePodConfig(){
-  try{ localStorage.setItem('wplanner_v6', JSON.stringify(podConfig)); }catch(e){}
+  try{ localStorage.setItem('wplanner_v7', JSON.stringify(podConfig)); }catch(e){}
   const el=document.getElementById('save-ok');
   if(el){el.style.display='inline';setTimeout(()=>el.style.display='none',1500);}
 }
-
 loadPodConfig();
 
 // ── EXPRESS MODE ─────────────────────────────────────────────────────
@@ -474,7 +473,6 @@ function loadPool(e,type){
   };
   reader.readAsText(file);
 }
-
 function loadCaps(e){
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
@@ -483,7 +481,6 @@ function loadCaps(e){
     let n=0;
     Object.entries(caps).forEach(([pod,data])=>{
       if(!podConfig[pod]) return;
-      // CAPS ONLY — never touch active, brand, criteria, capOverride
       podConfig[pod].line=data.line;
       podConfig[pod].sorter=data.sorter;
       podConfig[pod].orders=data.orders;
@@ -496,9 +493,20 @@ function loadCaps(e){
   reader.readAsText(file);
 }
 
+// ── NEW WAVE (clear output, keep pool loaded) ────────────────────────
+function newWave(){
+  document.getElementById('wave-out').style.display='none';
+  document.getElementById('out-body').innerHTML='';
+  document.getElementById('out-totals').innerHTML='';
+  document.getElementById('out-warns').innerHTML='';
+  document.getElementById('wave-name').value='';
+  document.getElementById('wave-units').value='';
+  // Scroll back to setup
+  document.getElementById('pool-panel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
 // ── POOL SUMMARY & TABLE ─────────────────────────────────────────────
 function sumPool(p){return Object.values(p).reduce((s,v)=>s+Object.values(v).reduce((a,b)=>a+b,0),0);}
-
 function buildSummary(){
   const tO=sumPool(ordersPool),tU=sumPool(unitsPool);
   const ppo=tO>0?(tU/tO).toFixed(2):'—';
@@ -512,7 +520,6 @@ function buildSummary(){
     <div class="stat-card"><div class="stat-label">Earliest Date</div><div class="stat-value" style="font-size:15px">${fmtDate(early)}</div><div class="stat-sub">${earlyO.toLocaleString()} orders</div></div>`;
   document.getElementById('pool-summary-bar').style.display='block';
 }
-
 function buildPoolTable(){
   const cols=allDates.slice(0,8);
   const criteria=Object.keys(ordersPool).sort((a,b)=>{
@@ -538,14 +545,14 @@ function buildPoolTable(){
 // ── WAVE GENERATION ──────────────────────────────────────────────────
 function generateWave(){
   if(!ordersPool||!unitsPool) return;
-  const name=document.getElementById('wave-name').value.trim()||'WAVE';
+  const name=document.getElementById('wave-name').value.trim();
   const capU=parseInt(document.getElementById('wave-units').value)||0;
   const brandFilter=document.getElementById('wave-brand').value;
-  const daysOut=parseInt(document.getElementById('wave-daysout').value)||4;
   const xpN=parseInt(document.getElementById('xp-n').value)||3;
   if(!capU){alert('Enter Selection capacity in units.');return;}
 
-  const eligDates=allDates.slice(0,daysOut);
+  // All dates — no artificial ceiling
+  const eligDates=[...allDates];
 
   // Decide brand for "both" pods
   const podBrand={};
@@ -568,7 +575,6 @@ function generateWave(){
     if(brandFilter!=='both'&&brand!==brandFilter) return;
     const isXp=EXPRESS_BASES.has(base);
 
-    // Date plan — oldest dates first, full date exhausted before moving on
     const dp=[];
     eligDates.forEach(date=>{
       const o=(ordersPool[fullCrit]||{})[date]||0;
@@ -580,29 +586,26 @@ function generateWave(){
     let tO=dp.reduce((s,d)=>s+d.orders,0);
     let tU=dp.reduce((s,d)=>s+d.units,0);
 
-    // Express divide mode
     if(isXp&&xpMode==='divide'&&xpN>1){
       tO=Math.ceil(tO/xpN);
       tU=Math.ceil(tU/xpN);
     }
 
     const ppo=tO>0?tU/tO:1;
-    const pri=PRI[base]||10;
-    candidates.push({fullCrit,base,brand,dp,tO,tU,ppo,pri,isXp});
+    candidates.push({fullCrit,base,brand,dp,tO,tU,ppo,pri:PRI[base]||10,isXp});
   });
 
-  // Sort: express first, then by SLA priority
   candidates.sort((a,b)=>{
     if(a.isXp!==b.isXp) return a.isXp?-1:1;
     return b.pri-a.pri;
   });
 
-  // Pod remaining caps
+  // Pod caps
   const podLeft={};
   Object.entries(podConfig).forEach(([pod,cfg])=>{
     if(cfg.active){
       const capO=cfg.capOverride!=null?cfg.capOverride:cfg.orders;
-      podLeft[pod]={orders:capO,units:cfg.units,originalOrders:capO};
+      podLeft[pod]={orders:capO,units:cfg.units,original:capO};
     }
   });
 
@@ -613,7 +616,6 @@ function generateWave(){
   candidates.forEach(cand=>{
     if(budget<=0) return;
 
-    // Find eligible pods
     const eligPods=Object.entries(podConfig).filter(([pod,cfg])=>{
       if(!cfg.active||!podLeft[pod]) return false;
       if(!cfg.criteria.includes(cand.base)) return false;
@@ -630,32 +632,26 @@ function generateWave(){
       return;
     }
 
-    // Sort eligible pods: Line 3 before Line 1 for shared criteria
-    // Then: partially-used pods first (fill before opening new), then by remaining capacity
+    // Sort pods: Line 3 before Line 1 for shared criteria, then fill partials first
     eligPods.sort((a,b)=>{
-      const aIsL3=LINE3_PODS.has(a[0]), bIsL3=LINE3_PODS.has(b[0]);
-      const aIsL1=LINE1_OVERFLOW_PODS.has(a[0]), bIsL1=LINE1_OVERFLOW_PODS.has(b[0]);
-      // L3L1 criteria: prefer Line 3 over Line 1
-      if(L3L1_CRITERIA.includes(cand.base)){
-        if(aIsL3&&!bIsL3) return -1;
-        if(!aIsL3&&bIsL3) return 1;
-        if(aIsL1&&!bIsL1) return 1; // L1 goes last if L3 available
-        if(!aIsL1&&bIsL1) return -1;
+      if(L3L1.has(cand.base)){
+        const aL3=LINE3.has(a[0]),bL3=LINE3.has(b[0]);
+        const aL1=LINE1_OVF.has(a[0]),bL1=LINE1_OVF.has(b[0]);
+        if(aL3&&!bL3) return -1;
+        if(!aL3&&bL3) return 1;
+        if(aL1&&!bL1) return 1;
+        if(!aL1&&bL1) return -1;
       }
-      // Within same line tier: fill partially-used pods first
-      const aUsed=podLeft[a[0]].orders < podLeft[a[0]].originalOrders;
-      const bUsed=podLeft[b[0]].orders < podLeft[b[0]].originalOrders;
+      const aUsed=podLeft[a[0]].orders<podLeft[a[0]].original;
+      const bUsed=podLeft[b[0]].orders<podLeft[b[0]].original;
       if(aUsed&&!bUsed) return -1;
       if(!aUsed&&bUsed) return 1;
-      return podLeft[b[0]].orders - podLeft[a[0]].orders;
+      return podLeft[b[0]].orders-podLeft[a[0]].orders;
     });
 
     const [podName]=eligPods[0];
     const pLeft=podLeft[podName];
-
-    const maxByPod=pLeft.orders;
-    const maxByBudget=Math.floor(budget/cand.ppo);
-    const maxO=Math.min(cand.tO,maxByPod,maxByBudget);
+    const maxO=Math.min(cand.tO,pLeft.orders,Math.floor(budget/cand.ppo));
 
     if(maxO<=0){
       if(cand.tO>=MIN_WARN_ORDERS)
@@ -663,17 +659,14 @@ function generateWave(){
       return;
     }
 
-    // Pull from oldest dates first, exhausting each full date before moving to next
-    // Stop when we've hit maxO — may leave part of final date untouched
+    // Oldest dates first — exhaust each full date before moving to next
     let left=maxO;
     const datePlan=[];
     for(const d of cand.dp){
       if(left<=0) break;
-      // Take the full date if possible, otherwise take what remains of our budget
       const take=Math.min(d.orders,left);
       datePlan.push({date:d.date,orders:take});
       left-=take;
-      // If we took the full date, move to next. If we didn't (left hit 0), stop.
     }
     const actualO=maxO-left;
     const actualU=Math.round(actualO*cand.ppo);
@@ -685,7 +678,7 @@ function generateWave(){
     planned.push({...cand,plannedO:actualO,plannedU:actualU,dp:datePlan,pod:podName});
   });
 
-  renderOutput(name,capU,planned,budget,warnings);
+  renderOutput(name||'WAVE',capU,planned,budget,warnings);
 }
 
 // ── RENDER OUTPUT ────────────────────────────────────────────────────
@@ -737,7 +730,7 @@ function wRow(p){
 }
 
 function copyOut(){
-  const name=document.getElementById('wave-name').value||'WAVE';
+  const name=document.getElementById('out-title').querySelector('span').textContent;
   const rows=document.querySelectorAll('.wave-row');
   let txt=`WAVE PLAN — ${name} — ${new Date().toLocaleString()}\n${'─'.repeat(72)}\n`;
   txt+=`${'Criteria'.padEnd(22)}${'Orders'.padStart(8)}  ${'Units'.padStart(8)}  ${'Pod'.padEnd(14)}Dates\n${'─'.repeat(72)}\n`;
@@ -774,8 +767,7 @@ function podCard(pod){
     <div class="pod-meta">Line <span>${cfg.line||'—'}</span> · <span>${cfg.sorter||'—'}</span> · Physical cap <span>${cfg.orders}</span> ord / <span>${(cfg.units||0).toLocaleString()}</span> units</div>
     <div class="pod-cap-row">
       <label>Working cap:</label>
-      <input type="number" value="${capO||0}" min="1"
-        onchange="setCapOverride('${pod}',this.value)"/>
+      <input type="number" value="${capO||0}" min="1" onchange="setCapOverride('${pod}',this.value)"/>
       <span>orders</span>
     </div>
     <div class="pod-brand-row">
@@ -792,7 +784,6 @@ function podCard(pod){
     </div>
   </div>`;
 }
-
 function togglePod(pod){
   podConfig[pod].active=!podConfig[pod].active;savePodConfig();
   const on=podConfig[pod].active;
@@ -826,16 +817,13 @@ function setAllActive(val){Object.keys(podConfig).forEach(p=>podConfig[p].active
 function confirmReset(){document.getElementById('reset-modal').classList.add('open');}
 function closeModal(){document.getElementById('reset-modal').classList.remove('open');}
 function resetPods(){
-  // Keep caps, restore everything else to defaults
   const caps={};
   Object.entries(podConfig).forEach(([p,v])=>caps[p]={line:v.line,sorter:v.sorter,orders:v.orders,units:v.units});
-  loadPodConfig(); // reload defaults
-  // Re-apply caps only
+  try{localStorage.removeItem('wplanner_v7');}catch(e){}
+  loadPodConfig();
   Object.entries(caps).forEach(([p,v])=>{
     if(podConfig[p]){podConfig[p].line=v.line;podConfig[p].sorter=v.sorter;podConfig[p].orders=v.orders;podConfig[p].units=v.units;}
   });
-  // Clear saved so it rebuilds from defaults + caps
-  try{localStorage.removeItem('wplanner_v6');}catch(e){}
   savePodConfig();closeModal();buildPodGrid();
 }
 
