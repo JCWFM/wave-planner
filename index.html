@@ -99,6 +99,7 @@
   .pod-tag9{background:rgba(196,122,240,.15);color:var(--madewell);border:1px solid rgba(196,122,240,.3)}
   .pod-tagX{background:rgba(240,160,74,.12);color:var(--accent2);border:1px solid rgba(240,160,74,.3)}
   .pod-tagM{background:rgba(255,255,255,.06);color:var(--text2);border:1px solid var(--border)}
+  .pod-tagB{background:rgba(74,240,160,.08);color:var(--accent);border:1px solid rgba(74,240,160,.25);font-style:italic}
   .totals-bar{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px}
   .ti .tl{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
   .ti .tv{font-family:var(--mono);font-size:18px;font-weight:500;color:var(--accent)}
@@ -749,38 +750,29 @@ function generateWave(){
     }
   });
 
-  // Assign orders to pods — each criteria can span multiple pods
-  // Result: array of {fullCrit, brand, isXp, ppo, plannedO, plannedU, pods[], dateRange}
+  // ── POD ASSIGNMENT ──────────────────────────────────────────────────
+  // High-PPO threshold: criteria above this get a dedicated overflow buffer pod
+  const HIGH_PPO = 6;
+  const BUFFER_PCT = 0.10;
+  const podBufferReserved = {};
+
   const results = [];
   const warnings = [];
   let budgetLeft = capU;
 
-  candidates.forEach(cand => {
-    if(budgetLeft <= 0) return;
-
-    // Constrain target to budget
-    const maxByBudget = Math.floor(budgetLeft / cand.ppo);
-    let allocO = Math.min(cand.targetO, maxByBudget);
-    if(allocO <= 0) return;
-
-    // Find eligible pods sorted by line preference + fill
-    let eligPods = Object.entries(podConfig).filter(([pod,cfg]) => {
-      if(!cfg.active || !podLeft[pod]) return false;
+  // Helper: get eligible pods for a candidate, sorted by line preference
+  function getEligPods(cand, excludePods){
+    const excl = excludePods || new Set();
+    return Object.entries(podConfig).filter(([pod,cfg]) => {
+      if(!cfg.active || !podLeft[pod] || podLeft[pod].orders <= 0) return false;
+      if(excl.has(pod)) return false;
       if(!cfg.criteria.includes(cand.base)) return false;
       if(cfg.brand === 'apo') return true;
       if(cfg.brand === '7') return cand.brand === '7';
       if(cfg.brand === '9') return cand.brand === '9';
       if(cfg.brand === 'both') return podBrand[pod] === cand.brand;
       return false;
-    });
-
-    if(!eligPods.length){
-      if(cand.totalO >= MIN_WARN_ORDERS)
-        warnings.push(`${cand.fullCrit}: ${cand.totalO} orders — no active pod configured`);
-      return;
-    }
-
-    eligPods.sort((a,b) => {
+    }).sort((a,b) => {
       if(L3L1_SET.has(cand.base)){
         const aL3=LINE3.has(a[0]),bL3=LINE3.has(b[0]);
         const aL1=LINE1_OVF.has(a[0]),bL1=LINE1_OVF.has(b[0]);
@@ -792,24 +784,36 @@ function generateWave(){
       if(aU&&!bU) return -1; if(!aU&&bU) return 1;
       return podLeft[b[0]].orders - podLeft[a[0]].orders;
     });
+  }
 
-    // Pull orders from date queue oldest-first, spread across pods
-    let ordersRemaining = allocO;
-    let dateIdx = 0;
-    let dateRemaining = cand.dp.length > 0 ? cand.dp[0].orders : 0;
+  // Helper: assign ordersToPlace from a candidate across eligible pods
+  // Returns {plannedO, plannedU, usedPods, allDatePlan, dateIdx, dateRemaining}
+  function assignToPods(cand, ordersToPlace, startDateIdx, startDateRem, excludePods){
+    const eligPods = getEligPods(cand, excludePods);
+    if(!eligPods.length) return null;
+
+    const isHighPPO = cand.ppo > HIGH_PPO;
+    let ordersRemaining = ordersToPlace;
+    let dateIdx = startDateIdx;
+    let dateRemaining = startDateRem;
     const usedPods = [];
     let totalPlannedO = 0, totalPlannedU = 0;
-    const allDatePlan = []; // collect all date entries across all pods
+    const allDatePlan = [];
 
     for(const [podName] of eligPods){
-      if(ordersRemaining <= 0) break;
+      if(ordersRemaining <= 0 || budgetLeft <= 0) break;
       const pLeft = podLeft[podName];
       if(pLeft.orders <= 0) continue;
 
-      const takeO = Math.min(ordersRemaining, pLeft.orders, Math.floor(budgetLeft / cand.ppo));
+      // Respect buffer reservation — don't fill into reserved space
+      const reserved = podBufferReserved[podName] || 0;
+      const effectiveCap = Math.max(0, pLeft.orders - reserved);
+      if(effectiveCap <= 0) continue;
+
+      const takeO = Math.min(ordersRemaining, effectiveCap, Math.floor(budgetLeft / cand.ppo));
       if(takeO <= 0) continue;
 
-      // Pull from date queue
+      // Pull from date queue oldest-first
       let rem = takeO;
       let qi = dateIdx;
       let qr = dateRemaining;
@@ -837,31 +841,134 @@ function generateWave(){
       allDatePlan.push(...datePlan);
     }
 
-    if(totalPlannedO > 0){
-      // Merge date plan for display (combine same dates)
-      const dateMap = {};
-      allDatePlan.forEach(({date,orders}) => dateMap[date] = (dateMap[date]||0) + orders);
-      const mergedDates = Object.entries(dateMap)
-        .sort((a,b) => new Date(a[0])-new Date(b[0]))
-        .map(([d,o]) => ({date:d,orders:o}));
+    return {totalPlannedO, totalPlannedU, usedPods, allDatePlan, dateIdx, dateRemaining, ordersUnplaced: ordersRemaining};
+  }
 
-      results.push({
-        fullCrit: cand.fullCrit,
-        base: cand.base,
-        brand: cand.brand,
-        isXp: cand.isXp,
-        ppo: cand.ppo,
-        plannedO: totalPlannedO,
-        plannedU: totalPlannedU,
-        pods: usedPods,
-        datePlan: mergedDates,
-      });
+  // ── FIRST PASS: plan all candidates ─────────────────────────────────
+  // Track date queue state per criteria for second pass
+  const critDateState = {}; // fullCrit -> {dateIdx, dateRem, ordersPlanned}
+
+  candidates.forEach(cand => {
+    if(budgetLeft <= 0) return;
+
+    const maxByBudget = Math.floor(budgetLeft / cand.ppo);
+    const allocO = Math.min(cand.targetO, maxByBudget);
+    if(allocO <= 0) return;
+
+    const eligPods = getEligPods(cand);
+    if(!eligPods.length){
+      if(cand.totalO >= MIN_WARN_ORDERS)
+        warnings.push(`${cand.fullCrit}: ${cand.totalO} orders — no active pod configured`);
+      return;
     }
 
-    if(ordersRemaining > MIN_WARN_ORDERS){
-      warnings.push(`${cand.fullCrit}: ${ordersRemaining} orders couldn't be placed — pod capacity exhausted`);
+    const startDateRem = cand.dp.length > 0 ? cand.dp[0].orders : 0;
+    const res = assignToPods(cand, allocO, 0, startDateRem);
+    if(!res || res.totalPlannedO <= 0) return;
+
+    critDateState[cand.fullCrit] = {
+      dateIdx: res.dateIdx,
+      dateRem: res.dateRemaining,
+      ordersPlanned: res.totalPlannedO,
+    };
+
+    // ── HIGH-PPO BUFFER POD ──────────────────────────────────────────
+    // If PPO > 6 and a used pod is at/near full, find one additional pod
+    // and reserve 10% of its cap for MAWM ghost split overflow.
+    // The buffer pod is loaded normally with other criteria but stays 10% open.
+    // Ghost reservation is NOT in totals or budget.
+    let bufferPod = null;
+    if(cand.ppo > HIGH_PPO){
+      const usedSet = new Set(res.usedPods);
+      const anyFull = res.usedPods.some(p => {
+        const pl = podLeft[p];
+        return pl && pl.orders <= Math.ceil((pl.original||1) * 0.05);
+      });
+      if(anyFull){
+        const overflowOpts = getEligPods(cand, usedSet).filter(([p]) => (podLeft[p]?.orders||0) > 0);
+        if(overflowOpts.length > 0){
+          bufferPod = overflowOpts[0][0];
+          const reserveAmt = Math.max(1, Math.floor((podLeft[bufferPod]?.original||10) * BUFFER_PCT));
+          podBufferReserved[bufferPod] = (podBufferReserved[bufferPod]||0) + reserveAmt;
+        }
+      }
+    }
+
+    const dateMap = {};
+    res.allDatePlan.forEach(({date,orders}) => dateMap[date] = (dateMap[date]||0) + orders);
+    const mergedDates = Object.entries(dateMap)
+      .sort((a,b) => new Date(a[0])-new Date(b[0]))
+      .map(([d,o]) => ({date:d,orders:o}));
+
+    results.push({
+      fullCrit: cand.fullCrit,
+      base: cand.base,
+      brand: cand.brand,
+      isXp: cand.isXp,
+      ppo: cand.ppo,
+      plannedO: res.totalPlannedO,
+      plannedU: res.totalPlannedU,
+      pods: res.usedPods,
+      bufferPod,
+      datePlan: mergedDates,
+      _candRef: cand,
+    });
+
+    if(res.ordersUnplaced > MIN_WARN_ORDERS){
+      warnings.push(`${cand.fullCrit}: ${res.ordersUnplaced} orders couldn't be placed — pod capacity exhausted`);
     }
   });
+
+  // ── SECOND PASS: top up to hit cap ───────────────────────────────────
+  // If budget still remains, go back through candidates proportionally
+  // and pull more from each until budget is hit or pool is exhausted
+  if(budgetLeft > 50){
+    // Build list of candidates that still have pool orders remaining
+    const topUpCandidates = results
+      .filter(r => !r.isXp) // don't touch express — it's already set correctly
+      .map(r => {
+        const cand = r._candRef;
+        const state = critDateState[r.fullCrit] || {dateIdx:0, dateRem: cand.dp[0]?.orders||0};
+        const ordersLeft = cand.totalO - r.plannedO;
+        return {r, cand, state, ordersLeft};
+      })
+      .filter(x => x.ordersLeft > 0);
+
+    if(topUpCandidates.length > 0){
+      // Distribute remaining budget proportionally by ordersLeft * priority
+      const totalWeight = topUpCandidates.reduce((s,x) => s + x.ordersLeft * (x.cand.pri||1), 0);
+
+      topUpCandidates.forEach(x => {
+        if(budgetLeft <= 0) return;
+        const weight = x.ordersLeft * (x.cand.pri||1);
+        const budgetShare = Math.floor(budgetLeft * (weight / totalWeight));
+        const addO = Math.min(x.ordersLeft, Math.floor(budgetShare / x.cand.ppo));
+        if(addO <= 0) return;
+
+        const eligPods = getEligPods(x.cand);
+        if(!eligPods.length) return;
+
+        const res = assignToPods(x.cand, addO, x.state.dateIdx, x.state.dateRem);
+        if(!res || res.totalPlannedO <= 0) return;
+
+        // Merge into existing result row
+        x.r.plannedO += res.totalPlannedO;
+        x.r.plannedU += res.totalPlannedU;
+        // Add new pods (dedup)
+        res.usedPods.forEach(p => { if(!x.r.pods.includes(p)) x.r.pods.push(p); });
+        // Merge dates
+        const dateMap = {};
+        [...x.r.datePlan, ...res.allDatePlan].forEach(({date,orders}) =>
+          dateMap[date] = (dateMap[date]||0) + orders);
+        x.r.datePlan = Object.entries(dateMap)
+          .sort((a,b) => new Date(a[0])-new Date(b[0]))
+          .map(([d,o]) => ({date:d,orders:o}));
+      });
+    }
+  }
+
+  // Clean up internal reference before render
+  results.forEach(r => delete r._candRef);
 
   // Compute critical warnings — criteria that MUST wave to stay under SLA
   // Critical = has orders due today (earliest date in pool) OR urgency >= 1 order per wave
@@ -943,16 +1050,15 @@ function renderOutput(name, capU, wavesLeft, wavesPerDay, results, remaining, wa
 function wRow(r){
   const brand = r.brand;
   const tagClass = r.isXp ? 'pod-tagX' : brand === '7' ? 'pod-tag7' : 'pod-tag9';
-  // Sort pods numerically
-  const sortedPods = [...r.pods].sort((a,b) => {
-    const na = parseInt(a.replace(/\D/g,'')), nb = parseInt(b.replace(/\D/g,''));
-    return na - nb;
-  });
+  const sortedPods = [...r.pods].sort((a,b) => parseInt(a.replace(/\D/g,'')) - parseInt(b.replace(/\D/g,'')));
   const podTags = sortedPods.map(p => `<span class="pod-tag ${tagClass}">${p}</span>`).join('');
+  const bufferTag = r.bufferPod
+    ? `<span class="pod-tag pod-tagB" title="Buffer pod — keep 10% open for MAWM splits">${r.bufferPod} ⟳</span>`
+    : '';
 
   const dates = r.datePlan;
   let dateStr = '';
-  if(dates.length === 0) dateStr = '—';
+  if(!dates.length) dateStr = '—';
   else if(dates.length === 1) dateStr = fmtDate(dates[0].date);
   else dateStr = `${fmtDate(dates[0].date)} → ${fmtDate(dates[dates.length-1].date)}`;
 
@@ -963,7 +1069,7 @@ function wRow(r){
     </div>
     <div class="wo">${r.plannedO.toLocaleString()} <span>ord · ${r.plannedU.toLocaleString()} units</span></div>
     <div class="wd">${dateStr}</div>
-    <div class="wpods">${podTags}</div>
+    <div class="wpods">${podTags}${bufferTag}</div>
   </div>`;
 }
 
