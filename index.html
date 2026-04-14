@@ -919,51 +919,54 @@ function generateWave(){
     }
   });
 
-  // ── SECOND PASS: top up to hit cap ───────────────────────────────────
-  // If budget still remains, go back through candidates proportionally
-  // and pull more from each until budget is hit or pool is exhausted
-  if(budgetLeft > 50){
-    // Build list of candidates that still have pool orders remaining
-    const topUpCandidates = results
-      .filter(r => !r.isXp) // don't touch express — it's already set correctly
-      .map(r => {
-        const cand = r._candRef;
-        const state = critDateState[r.fullCrit] || {dateIdx:0, dateRem: cand.dp[0]?.orders||0};
-        const ordersLeft = cand.totalO - r.plannedO;
-        return {r, cand, state, ordersLeft};
-      })
-      .filter(x => x.ordersLeft > 0);
+  // ── SECOND PASS: greedy top-up to hit cap ────────────────────────────
+  // Keep looping through non-express candidates with remaining pool orders,
+  // filling more into any pod that still has space, until budget is hit or
+  // all pods and pool orders are exhausted.
+  if(budgetLeft > 0){
+    let madeProgress = true;
+    let safetyLimit = 20; // max iterations to avoid infinite loop
 
-    if(topUpCandidates.length > 0){
-      // Distribute remaining budget proportionally by ordersLeft * priority
-      const totalWeight = topUpCandidates.reduce((s,x) => s + x.ordersLeft * (x.cand.pri||1), 0);
+    while(budgetLeft > 0 && madeProgress && safetyLimit-- > 0){
+      madeProgress = false;
 
-      topUpCandidates.forEach(x => {
-        if(budgetLeft <= 0) return;
-        const weight = x.ordersLeft * (x.cand.pri||1);
-        const budgetShare = Math.floor(budgetLeft * (weight / totalWeight));
-        const addO = Math.min(x.ordersLeft, Math.floor(budgetShare / x.cand.ppo));
-        if(addO <= 0) return;
+      // Sort candidates by priority so highest urgency gets topped up first
+      const topUp = results
+        .filter(r => !r.isXp)
+        .map(r => ({r, cand: r._candRef, state: critDateState[r.fullCrit]}))
+        .filter(x => x.cand && (x.cand.totalO - x.r.plannedO) > 0)
+        .sort((a,b) => (b.cand.pri||0) - (a.cand.pri||0));
 
-        const eligPods = getEligPods(x.cand);
-        if(!eligPods.length) return;
+      for(const x of topUp){
+        if(budgetLeft <= 0) break;
+        const ordersLeft = x.cand.totalO - x.r.plannedO;
+        if(ordersLeft <= 0) continue;
 
-        const res = assignToPods(x.cand, addO, x.state.dateIdx, x.state.dateRem);
-        if(!res || res.totalPlannedO <= 0) return;
+        // Try to add as many as budget allows — no fractional share, just fill
+        const maxByBudget = Math.floor(budgetLeft / x.cand.ppo);
+        const addO = Math.min(ordersLeft, maxByBudget);
+        if(addO <= 0) continue;
 
-        // Merge into existing result row
+        const state = x.state || {dateIdx:0, dateRem: x.cand.dp[0]?.orders||0};
+        const res = assignToPods(x.cand, addO, state.dateIdx, state.dateRem);
+        if(!res || res.totalPlannedO <= 0) continue;
+
+        // Update date state for next iteration
+        critDateState[x.r.fullCrit] = {dateIdx: res.dateIdx, dateRem: res.dateRemaining};
+
         x.r.plannedO += res.totalPlannedO;
         x.r.plannedU += res.totalPlannedU;
-        // Add new pods (dedup)
         res.usedPods.forEach(p => { if(!x.r.pods.includes(p)) x.r.pods.push(p); });
-        // Merge dates
+
         const dateMap = {};
         [...x.r.datePlan, ...res.allDatePlan].forEach(({date,orders}) =>
           dateMap[date] = (dateMap[date]||0) + orders);
         x.r.datePlan = Object.entries(dateMap)
           .sort((a,b) => new Date(a[0])-new Date(b[0]))
           .map(([d,o]) => ({date:d,orders:o}));
-      });
+
+        madeProgress = true;
+      }
     }
   }
 
