@@ -244,6 +244,7 @@
           <input type="number" id="xp-n" value="3" min="1" max="20"/>
           <span>waves</span>
         </div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-left:4px">· EXPRESS1 always cleaned each wave regardless of mode</span>
       </div>
     </div>
 
@@ -313,8 +314,9 @@ const BASE_CRITERIA = [
   'GIFTBOX','GIFTMSG','GOH','GOH1','MONO','NORD','OFFLINE',
   'OFFLINE1','OFFLINE5','OVNC','OVNC1','QC','SHOES','STND',
 ];
-const SINGLES_BASES = new Set(['OFFLINE1','EXPRESS1','OVNC1','GOH1']);
-const EXPRESS_BASES = new Set(['EXPRESS','EXOFFLINE']);
+// No singles exclusion — if a pod has it active, it gets planned
+const EXPRESS_BASES = new Set(['EXPRESS','EXOFFLINE','EXPRESS1']);
+const EXPRESS1_BASES = new Set(['EXPRESS1']); // always clean, never divided
 const MIN_WARN_ORDERS = 10;
 const PRI = {
   'EXPRESS':90,'EXOFFLINE':85,
@@ -617,7 +619,6 @@ function generateWave(){
     if(!cfg.active||cfg.brand!=='both') return;
     let s7=0,s9=0;
     cfg.criteria.forEach(base=>{
-      if(SINGLES_BASES.has(base)) return;
       const p=PRI[base]||10;
       s7+=allDates.reduce((s,d)=>s+((ordersPool['7-'+base]||{})[d]||0),0)*p;
       s9+=allDates.reduce((s,d)=>s+((ordersPool['9-'+base]||{})[d]||0),0)*p;
@@ -630,24 +631,27 @@ function generateWave(){
   Object.keys(ordersPool).forEach(fullCrit => {
     const brand = fullCrit.startsWith('9-') ? '9' : '7';
     const base = fullCrit.replace(/^[79]-/,'');
-    if(SINGLES_BASES.has(base)) return;
     if(brandFilter !== 'both' && brand !== brandFilter) return;
     const isXp = EXPRESS_BASES.has(base);
 
     // Calculate urgency-based target for this wave
     let {targetO, targetU, ppo, dp, totalO, totalU} = calcUrgency(fullCrit, wavesLeft, wavesPerDay);
-    if(!targetO || !dp?.length) return;
+    if(!dp?.length) return;
 
-    // Express override
+    // Express: bypass urgency calc — use simple division of total pool
     if(isXp){
-      if(xpMode === 'clean'){
+      if(EXPRESS1_BASES.has(base) || xpMode === 'clean'){
+        // EXPRESS1 always cleans; EXPRESS/EXOFFLINE clean if mode is clean
         targetO = totalO;
         targetU = totalU;
       } else {
+        // Divide mode: EXPRESS and EXOFFLINE only
         targetO = Math.ceil(totalO / xpN);
         targetU = Math.ceil(totalU / xpN);
       }
     }
+
+    if(!targetO) return;
 
     candidates.push({
       fullCrit, base, brand, isXp, ppo: ppo||1,
@@ -663,29 +667,32 @@ function generateWave(){
     return;
   }
 
-  // Calculate total target units
-  let totalTargetU = candidates.reduce((s,c) => s + c.targetU, 0);
+  // Scale non-express proportionally to hit cap
+  // Express targets are fixed — exclude them from scaling
+  const nonXp = candidates.filter(c => !c.isXp);
+  const xpCands = candidates.filter(c => c.isXp);
+  const xpUnits = xpCands.reduce((s,c) => s+c.targetU, 0);
+  const nonXpTargetU = nonXp.reduce((s,c) => s+c.targetU, 0);
+  const nonXpCapRemaining = Math.max(0, capU - xpUnits);
 
-  // Scale proportionally to hit cap if under
-  // Keep scaling up until we hit cap or exhaust the pool
-  let scaleFactor = 1;
-  if(totalTargetU < capU){
-    // Find max possible units (total pool for all candidates)
-    const maxU = candidates.reduce((s,c) => s + c.totalU, 0);
-    if(maxU > 0){
-      scaleFactor = Math.min(capU / totalTargetU, maxU / totalTargetU);
+  if(nonXpTargetU > 0 && nonXpCapRemaining > 0){
+    const nonXpMaxU = nonXp.reduce((s,c) => s+c.totalU, 0);
+    let scaleFactor = 1;
+    if(nonXpTargetU < nonXpCapRemaining){
+      scaleFactor = Math.min(nonXpCapRemaining / nonXpTargetU, nonXpMaxU / Math.max(1, nonXpTargetU));
+    } else if(nonXpTargetU > nonXpCapRemaining){
+      scaleFactor = nonXpCapRemaining / nonXpTargetU;
     }
-    candidates.forEach(c => {
-      c.targetO = Math.min(Math.ceil(c.targetO * scaleFactor), c.totalO);
-      c.targetU = Math.min(Math.ceil(c.targetU * scaleFactor), c.totalU);
-    });
-  } else if(totalTargetU > capU){
-    // Scale down proportionally
-    scaleFactor = capU / totalTargetU;
-    candidates.forEach(c => {
-      c.targetO = Math.max(1, Math.floor(c.targetO * scaleFactor));
-      c.targetU = Math.floor(c.targetU * scaleFactor);
-    });
+    if(scaleFactor !== 1){
+      nonXp.forEach(c => {
+        c.targetO = scaleFactor > 1
+          ? Math.min(Math.ceil(c.targetO * scaleFactor), c.totalO)
+          : Math.max(1, Math.floor(c.targetO * scaleFactor));
+        c.targetU = scaleFactor > 1
+          ? Math.min(Math.ceil(c.targetU * scaleFactor), c.totalU)
+          : Math.floor(c.targetU * scaleFactor);
+      });
+    }
   }
 
   // Sort: express first, then by priority
