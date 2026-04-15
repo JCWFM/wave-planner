@@ -643,18 +643,10 @@ function generateWave(){
   if(!capU){alert('Enter Selection capacity in units.');return;}
   if(!wavesLeft){alert('Enter waves left today.');return;}
 
-  // Brand decision for "both" pods
-  const podBrand={};
-  Object.entries(podConfig).forEach(([pod,cfg])=>{
-    if(!cfg.active||cfg.brand!=='both') return;
-    let s7=0,s9=0;
-    cfg.criteria.forEach(base=>{
-      const p=PRI[base]||10;
-      s7+=allDates.reduce((s,d)=>s+((ordersPool['7-'+base]||{})[d]||0),0)*p;
-      s9+=allDates.reduce((s,d)=>s+((ordersPool['9-'+base]||{})[d]||0),0)*p;
-    });
-    podBrand[pod]=s7>=s9?'7':'9';
-  });
+  // Per-pod brand commitment — "both" pods get claimed by whichever brand uses them first.
+  // No global pre-decision. Each pod tracks which brand it committed to this wave.
+  // Once committed, only that brand can use it. Other "both" pods remain available for either brand.
+  const podCommitted = {}; // {podName: '7' or '9'} — set when first criteria claims the pod
 
   // Build candidate list — skip singles
   const candidates = [];
@@ -767,10 +759,16 @@ function generateWave(){
       if(!cfg.active || !podLeft[pod] || podLeft[pod].orders <= 0) return false;
       if(excl.has(pod)) return false;
       if(!cfg.criteria.includes(cand.base)) return false;
+      // Brand eligibility check
       if(cfg.brand === 'apo') return true;
       if(cfg.brand === '7') return cand.brand === '7';
       if(cfg.brand === '9') return cand.brand === '9';
-      if(cfg.brand === 'both') return podBrand[pod] === cand.brand;
+      if(cfg.brand === 'both'){
+        // If this pod is already committed to a brand this wave, only that brand can use it
+        if(podCommitted[pod]) return podCommitted[pod] === cand.brand;
+        // Not yet committed — available for either brand
+        return true;
+      }
       return false;
     }).sort((a,b) => {
       if(L3L1_SET.has(cand.base)){
@@ -829,6 +827,11 @@ function generateWave(){
       const actual = takeO - rem;
       if(actual <= 0) continue;
       const actualU = Math.round(actual * cand.ppo);
+
+      // Commit "both" pod to this criteria's brand on first use
+      if(podConfig[podName]?.brand === 'both' && !podCommitted[podName]){
+        podCommitted[podName] = cand.brand;
+      }
 
       dateIdx = qi; dateRemaining = qr;
       pLeft.orders = Math.max(0, pLeft.orders - actual);
