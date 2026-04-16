@@ -19,7 +19,7 @@
   .header-brand{font-family:var(--display);font-size:18px;font-weight:800;letter-spacing:-0.5px;color:var(--accent)}
   .header-brand span{color:var(--text2);font-weight:700}
   .header-meta{font-family:var(--mono);font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px}
-  .tabs{display:flex;gap:2px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border)}
+  .tabs{display:flex;gap:2px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:56px;z-index:99}
   .tab{padding:10px 18px;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:1px;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;position:relative;top:1px}
   .tab:hover{color:var(--text2)}.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
   .main{padding:24px;max-width:1400px;margin:0 auto}
@@ -714,17 +714,13 @@ function generateWave(){
   fillBudget = Math.max(0, fillBudget - slaUnits);
 
   // ── PHASE 2: DATE-DRIVEN FILL ─────────────────────────────────────────
-  // With remaining budget, sweep through dates oldest→newest across ALL criteria.
-  // On each date, take orders proportionally from every criteria that has orders
-  // on that date — more orders on the date = more taken, naturally.
-  // Stop when budget is exhausted or all dates are consumed.
+  // With remaining budget, sweep dates oldest→newest across ALL criteria.
+  // On each date: take from every criteria proportionally to how many orders
+  // it has on that date. More orders on the date = more taken.
+  // Each criteria is capped at its pool total (totalO).
+  // Stop when budget is exhausted or all dates consumed.
   if(fillBudget > 0){
-    // Build a map of how many orders are ALREADY allocated (from SLA floor)
-    // so we know what's left in each criteria's date queue
-    const alreadyAllocated = {}; // fullCrit -> orders already committed
-    nonXp.forEach(c => { alreadyAllocated[c.fullCrit] = c.slaFloorO; });
-
-    // Get all unique dates across all non-express criteria, sorted oldest first
+    // Get all unique dates sorted oldest first
     const allDatesSorted = [...new Set(
       nonXp.flatMap(c => c.dp.map(d => d.date))
     )].sort((a,b) => new Date(a)-new Date(b));
@@ -732,71 +728,41 @@ function generateWave(){
     for(const date of allDatesSorted){
       if(fillBudget <= 0) break;
 
-      // Find all criteria with orders on this date that haven't been fully allocated
-      const critOnDate = nonXp.filter(c => {
+      // For each criteria: how many orders does it have on this date,
+      // and how many more can it still accept (hasn't hit pool total)?
+      const available = nonXp.map(c => {
         const dateEntry = c.dp.find(d => d.date === date);
-        if(!dateEntry) return false;
-        const alreadyFromThisDate = Math.max(0,
-          alreadyAllocated[c.fullCrit] - c.dp
-            .filter(d => new Date(d.date) < new Date(date))
-            .reduce((s,d) => s+d.orders, 0)
-        );
-        const remainingOnDate = dateEntry.orders - Math.min(alreadyFromThisDate, dateEntry.orders);
-        return remainingOnDate > 0 && c.targetO < c.totalO;
-      });
+        if(!dateEntry) return {c, avail:0};
+        const canTakeMore = c.totalO - c.targetO; // how many more this criteria can absorb
+        const avail = Math.min(dateEntry.orders, canTakeMore);
+        return {c, avail};
+      }).filter(x => x.avail > 0);
 
-      if(!critOnDate.length) continue;
+      if(!available.length) continue;
 
-      // Total available orders on this date across eligible criteria
-      const totalOnDate = critOnDate.reduce((s,c) => {
-        const dateEntry = c.dp.find(d => d.date === date);
-        const alreadyFromThisDate = Math.max(0,
-          alreadyAllocated[c.fullCrit] - c.dp
-            .filter(d => new Date(d.date) < new Date(date))
-            .reduce((s2,d) => s2+d.orders, 0)
-        );
-        return s + Math.max(0, dateEntry.orders - Math.min(alreadyFromThisDate, dateEntry.orders));
-      }, 0);
+      const totalAvailOrders = available.reduce((s,x) => s+x.avail, 0);
+      // How many units would taking all available on this date cost?
+      const unitsIfAll = available.reduce((s,x) => s + Math.round(x.avail * x.c.ppo), 0);
 
-      // How many units would taking ALL of this date cost?
-      const avgPPO = critOnDate.reduce((s,c) => s+c.ppo, 0) / critOnDate.length;
-      const unitsForAllOnDate = totalOnDate * avgPPO;
-
-      if(unitsForAllOnDate <= fillBudget){
-        // We can take everything on this date — do it
-        critOnDate.forEach(c => {
-          const dateEntry = c.dp.find(d => d.date === date);
-          const alreadyFromThisDate = Math.max(0,
-            alreadyAllocated[c.fullCrit] - c.dp
-              .filter(d => new Date(d.date) < new Date(date))
-              .reduce((s,d) => s+d.orders, 0)
-          );
-          const take = Math.max(0, dateEntry.orders - Math.min(alreadyFromThisDate, dateEntry.orders));
-          const takeU = Math.round(take * c.ppo);
-          c.targetO = Math.min(c.totalO, c.targetO + take);
-          c.targetU = Math.min(c.totalU, c.targetU + takeU);
-          alreadyAllocated[c.fullCrit] += take;
-          fillBudget -= takeU;
+      if(unitsIfAll <= fillBudget){
+        // Take everything available on this date
+        available.forEach(({c, avail}) => {
+          const u = Math.round(avail * c.ppo);
+          c.targetO = Math.min(c.totalO, c.targetO + avail);
+          c.targetU = Math.min(c.totalU, c.targetU + u);
+          fillBudget -= u;
         });
       } else {
-        // Budget runs out on this date — take proportionally from each criteria
-        const budgetFraction = fillBudget / unitsForAllOnDate;
-        critOnDate.forEach(c => {
-          const dateEntry = c.dp.find(d => d.date === date);
-          const alreadyFromThisDate = Math.max(0,
-            alreadyAllocated[c.fullCrit] - c.dp
-              .filter(d => new Date(d.date) < new Date(date))
-              .reduce((s,d) => s+d.orders, 0)
-          );
-          const available = Math.max(0, dateEntry.orders - Math.min(alreadyFromThisDate, dateEntry.orders));
-          const take = Math.min(available, Math.floor(available * budgetFraction));
-          const takeU = Math.round(take * c.ppo);
+        // Budget runs out here — take proportionally by orders available on this date
+        const fraction = fillBudget / unitsIfAll;
+        available.forEach(({c, avail}) => {
+          const take = Math.max(0, Math.floor(avail * fraction));
+          const u    = Math.round(take * c.ppo);
           c.targetO = Math.min(c.totalO, c.targetO + take);
-          c.targetU = Math.min(c.totalU, c.targetU + takeU);
-          alreadyAllocated[c.fullCrit] += take;
-          fillBudget -= takeU;
+          c.targetU = Math.min(c.totalU, c.targetU + u);
+          fillBudget -= u;
         });
-        break; // budget exhausted
+        break;
       }
     }
   }
