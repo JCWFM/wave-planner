@@ -276,9 +276,9 @@
         <div class="totals-bar" id="out-totals"></div>
         <div id="out-warns"></div>
         <div class="wave-actions">
-          <button class="btn btn-ghost btn-sm" onclick="copyOut()">Copy for Teams</button>
+          <button class="btn btn-ghost btn-sm" onclick="downloadCSV()">⬇ Download CSV</button>
           <button class="btn btn-ghost btn-sm" onclick="newWave()">↩ Plan Next Wave</button>
-          <span class="copy-ok" id="copy-ok">✓ Copied</span>
+          <span class="copy-ok" id="copy-ok">✓ Downloaded</span>
         </div>
       </div>
     </div>
@@ -579,51 +579,46 @@ function buildPoolTable(){
 }
 
 // ── CORE PLANNING ALGORITHM ──────────────────────────────────────────
-// For each criteria, calculate urgency-based target orders for this wave.
-// urgency = orders_for_date / waves_available_to_clear_that_date
-// waves_available(dateIndex) = wavesLeftToday + (daysOut * wavesPerDay)
-// Sum urgency across all dates for each criteria = target orders this wave.
-// Then scale proportionally to hit selection cap.
+// Per-date urgency: orders_on_date / waves_available_to_clear_that_date
+// waves_available(date) = wavesLeftToday + (dayOffset * wavesPerDay)
+// Target for this wave = sum of per-date urgency shares (rounded up)
+// Physical pulling always exhausts oldest date first regardless of which
+// date drove the urgency number.
 
 function calcUrgency(fullCrit, wavesLeft, wavesPerDay){
   const oByDate = ordersPool[fullCrit] || {};
   const uByDate = unitsPool[fullCrit] || {};
-  if(!allDates.length) return {targetO:0, targetU:0, dp:[]};
+  if(!allDates.length) return {targetO:0, targetU:0, ppo:1, dp:[], totalO:0, totalU:0};
 
-  // Find index of earliest date with orders — treat as "today"
   const datesWithOrders = allDates.filter(d => (oByDate[d]||0) > 0);
-  if(!datesWithOrders.length) return {targetO:0, targetU:0, dp:[]};
+  if(!datesWithOrders.length) return {targetO:0, targetU:0, ppo:1, dp:[], totalO:0, totalU:0};
 
-  const earliestDate = allDates[0]; // absolute earliest in pool
-  const firstDateWithOrders = datesWithOrders[0];
+  const earliestIdx = allDates.indexOf(allDates[0]);
 
-  // How many days offset is the first date of this criteria from the pool's earliest date?
-  const earliestIdx = allDates.indexOf(earliestDate);
-
+  // Per-date urgency share
   let targetO = 0;
   const dp = [];
 
   datesWithOrders.forEach(date => {
     const orders = oByDate[date] || 0;
-    const units = uByDate[date] || 0;
+    const units  = uByDate[date] || 0;
     if(!orders) return;
     const dayOffset = allDates.indexOf(date) - earliestIdx;
-    // wavesAvailable for this date: wavesLeft today covers day 0, each additional day adds wavesPerDay
+    // wavesAvailable: today's waves cover day 0, each additional day adds wavesPerDay
     const wavesAvail = Math.max(1, wavesLeft + (dayOffset * wavesPerDay));
     const share = orders / wavesAvail;
     targetO += share;
-    dp.push({date, orders, units, share});
+    dp.push({date, orders, units});
   });
 
-  // Sort dates oldest first for actual pulling
+  // Sort oldest first — physical pull always works from here
   dp.sort((a,b) => new Date(a.date) - new Date(b.date));
 
-  // targetO is the proportional share — round up to nearest order
+  // Round up — always wave at least what's needed to stay on pace
   targetO = Math.ceil(targetO);
 
-  // Calculate units from PPO
-  const totalO = datesWithOrders.reduce((s,d) => s + (oByDate[d]||0), 0);
-  const totalU = datesWithOrders.reduce((s,d) => s + (uByDate[d]||0), 0);
+  const totalO = dp.reduce((s,d) => s+d.orders, 0);
+  const totalU = dp.reduce((s,d) => s+d.units, 0);
   const ppo = totalO > 0 ? totalU/totalO : 1;
   const targetU = Math.ceil(targetO * ppo);
 
@@ -689,32 +684,59 @@ function generateWave(){
     return;
   }
 
-  // Scale non-express proportionally to hit cap
-  // Express targets are fixed — exclude them from scaling
+  // ── SCALE TO HIT SELECTION CAP ───────────────────────────────────────
+  // Express targets are fixed. Scale non-express proportionally to fill
+  // remaining cap — but each criteria is capped at its own pool total.
+  // We iterate so criteria hitting their pool ceiling release budget
+  // to others that still have room.
   const nonXp = candidates.filter(c => !c.isXp);
   const xpCands = candidates.filter(c => c.isXp);
   const xpUnits = xpCands.reduce((s,c) => s+c.targetU, 0);
-  const nonXpTargetU = nonXp.reduce((s,c) => s+c.targetU, 0);
-  const nonXpCapRemaining = Math.max(0, capU - xpUnits);
+  let capRemaining = Math.max(0, capU - xpUnits);
 
-  if(nonXpTargetU > 0 && nonXpCapRemaining > 0){
-    const nonXpMaxU = nonXp.reduce((s,c) => s+c.totalU, 0);
-    let scaleFactor = 1;
-    if(nonXpTargetU < nonXpCapRemaining){
-      scaleFactor = Math.min(nonXpCapRemaining / nonXpTargetU, nonXpMaxU / Math.max(1, nonXpTargetU));
-    } else if(nonXpTargetU > nonXpCapRemaining){
-      scaleFactor = nonXpCapRemaining / nonXpTargetU;
-    }
-    if(scaleFactor !== 1){
-      nonXp.forEach(c => {
-        c.targetO = scaleFactor > 1
-          ? Math.min(Math.ceil(c.targetO * scaleFactor), c.totalO)
-          : Math.max(1, Math.floor(c.targetO * scaleFactor));
-        c.targetU = scaleFactor > 1
-          ? Math.min(Math.ceil(c.targetU * scaleFactor), c.totalU)
-          : Math.floor(c.targetU * scaleFactor);
+  if(nonXp.length > 0 && capRemaining > 0){
+    // Iterative proportional scaling — capped criteria release budget to others
+    let iterations = 0;
+    let scaled = nonXp.map(c => ({...c, scaled: false}));
+
+    while(iterations++ < 10){
+      const uncapped = scaled.filter(c => !c.scaled);
+      const uncappedTargetU = uncapped.reduce((s,c) => s+c.targetU, 0);
+      if(uncappedTargetU <= 0) break;
+
+      const factor = capRemaining / uncappedTargetU;
+      let anyNewlyCapped = false;
+
+      uncapped.forEach(c => {
+        const newTargetO = factor > 1
+          ? Math.min(Math.ceil(c.targetO * factor), c.totalO)
+          : Math.max(1, Math.floor(c.targetO * factor));
+        const newTargetU = factor > 1
+          ? Math.min(Math.ceil(c.targetU * factor), c.totalU)
+          : Math.floor(c.targetU * factor);
+
+        if(factor > 1 && newTargetO >= c.totalO){
+          // Hit pool ceiling — mark as scaled, release its unit cost to others
+          c.targetO = c.totalO;
+          c.targetU = c.totalU;
+          c.scaled = true;
+          capRemaining -= c.totalU;
+          anyNewlyCapped = true;
+        } else {
+          c.targetO = newTargetO;
+          c.targetU = newTargetU;
+        }
       });
+
+      if(!anyNewlyCapped) break; // stable — everyone scaled proportionally
     }
+
+    // Write scaled values back to candidates
+    scaled.forEach((sc, i) => {
+      const orig = nonXp[i];
+      orig.targetO = sc.targetO;
+      orig.targetU = sc.targetU;
+    });
   }
 
   // Sort: express first, then by priority
@@ -1079,24 +1101,61 @@ function wRow(r){
   </div>`;
 }
 
-function copyOut(){
-  const name = document.getElementById('out-title').querySelector('span').textContent;
-  const rows = document.querySelectorAll('.wave-row');
-  let txt = `WAVE PLAN — ${name} — ${new Date().toLocaleString()}\n${'─'.repeat(78)}\n`;
-  txt += `${'Criteria'.padEnd(22)}${'Orders'.padStart(8)}  ${'Units'.padStart(8)}  ${'Dates'.padEnd(16)}Pods\n${'─'.repeat(78)}\n`;
-  rows.forEach(r => {
-    const crit = r.querySelector('.wc')?.textContent.replace(/PPO.*/,'').trim().padEnd(22)||'';
-    const ord = r.querySelector('.wo')?.textContent.match(/[\d,]+/)?.[0]?.padStart(8)||'';
-    const units = r.querySelector('.wo')?.textContent.match(/·\s*([\d,]+)/)?.[1]?.padStart(8)||'';
-    const dates = r.querySelector('.wd')?.textContent.trim().padEnd(16)||'';
-    const pods = [...r.querySelectorAll('.pod-tag')].map(p=>p.textContent).join(', ');
-    txt += `${crit}${ord}  ${units}  ${dates}${pods}\n`;
+function downloadCSV(){
+  const waveName = document.getElementById('out-title').querySelector('span').textContent;
+  const timestamp = new Date().toLocaleString();
+
+  // Header row
+  const headers = ['Wave Name','Brand','Criteria','PPO','Orders','Units','Date From','Date To','Pods','Buffer Pod'];
+  const rows = [headers];
+
+  // Collect from results (stored on last render)
+  document.querySelectorAll('.wave-section').forEach(section => {
+    const sectionTitle = section.querySelector('.wave-section-title')?.textContent?.trim() || '';
+    section.querySelectorAll('.wave-row').forEach(row => {
+      const crit = row.querySelector('.wc')?.textContent?.replace(/PPO.*/,'').trim() || '';
+      const ppo  = row.querySelector('.wppo')?.textContent?.replace('PPO','').trim() || '';
+      const ordUnits = row.querySelector('.wo')?.textContent || '';
+      const ordMatch = ordUnits.match(/([\d,]+)\s*ord/);
+      const unitsMatch = ordUnits.match(/·\s*([\d,]+)\s*units/);
+      const orders = ordMatch ? ordMatch[1].replace(/,/g,'') : '';
+      const units  = unitsMatch ? unitsMatch[1].replace(/,/g,'') : '';
+      const dateStr = row.querySelector('.wd')?.textContent?.trim() || '';
+      const dateParts = dateStr.split('→').map(d => d.trim());
+      const dateFrom = dateParts[0] || dateStr;
+      const dateTo   = dateParts[1] || dateParts[0] || dateStr;
+      const pods = [...row.querySelectorAll('.pod-tag:not(.pod-tagB)')]
+        .map(p => p.textContent.trim()).join('; ');
+      const buffer = row.querySelector('.pod-tagB')?.textContent?.replace('⟳','').trim() || '';
+
+      // Determine brand from section title
+      const brand = sectionTitle.includes('MADEWELL') ? 'Madewell' :
+                    sectionTitle.includes('J.CREW') ? 'J.Crew/Factory' : 'Express';
+
+      rows.push([waveName, brand, crit, ppo, orders, units, dateFrom, dateTo, pods, buffer]);
+    });
   });
-  txt += `\n${'─'.repeat(78)}\n${document.getElementById('out-totals').innerText.replace(/\n+/g,' | ').trim()}\n`;
-  navigator.clipboard.writeText(txt).then(() => {
-    const el = document.getElementById('copy-ok');
-    el.style.display = 'inline'; setTimeout(() => el.style.display='none', 2500);
-  });
+
+  // Build CSV string
+  const csv = rows.map(r =>
+    r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')
+  ).join('\r\n');
+
+  // Download
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const safeWave = waveName.replace(/[^a-zA-Z0-9_-]/g,'_');
+  a.href = url;
+  a.download = `WavePlan_${safeWave}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  const el = document.getElementById('copy-ok');
+  el.style.display='inline';
+  setTimeout(()=>el.style.display='none', 2500);
 }
 
 // ── POD MANAGER ──────────────────────────────────────────────────────
