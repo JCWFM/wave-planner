@@ -794,7 +794,7 @@ function generateWave(){
 
   // ── POD ASSIGNMENT ──────────────────────────────────────────────────
   // High-PPO threshold: criteria above this get a dedicated overflow buffer pod
-  const HIGH_PPO = 6;
+  const HIGH_PPO = 4;
   const BUFFER_PCT = 0.10;
   const podBufferReserved = {};
 
@@ -926,7 +926,7 @@ function generateWave(){
     };
 
     // ── HIGH-PPO BUFFER POD ──────────────────────────────────────────
-    // If PPO > 6 and a used pod is at/near full, find one additional pod
+    // If PPO > 4 and a used pod is at/near full, find one additional pod
     // and reserve 10% of its cap for MAWM ghost split overflow.
     // The buffer pod is loaded normally with other criteria but stays 10% open.
     // Ghost reservation is NOT in totals or budget.
