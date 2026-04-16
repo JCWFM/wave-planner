@@ -643,103 +643,165 @@ function generateWave(){
   // Once committed, only that brand can use it. Other "both" pods remain available for either brand.
   const podCommitted = {}; // {podName: '7' or '9'} — set when first criteria claims the pod
 
-  // Build candidate list — skip singles
+  // ── BUILD CANDIDATE LIST ─────────────────────────────────────────────
+  // Collect all eligible criteria with their pool data and SLA floor
   const candidates = [];
   Object.keys(ordersPool).forEach(fullCrit => {
     const brand = fullCrit.startsWith('9-') ? '9' : '7';
-    const base = fullCrit.replace(/^[79]-/,'');
+    const base  = fullCrit.replace(/^[79]-/,'');
     if(brandFilter !== 'both' && brand !== brandFilter) return;
     const isXp = EXPRESS_BASES.has(base);
 
-    // Calculate urgency-based target for this wave
-    let {targetO, targetU, ppo, dp, totalO, totalU} = calcUrgency(fullCrit, wavesLeft, wavesPerDay);
-    if(!dp?.length) return;
+    // Build date plan — oldest first
+    const dp = [];
+    allDates.forEach(date => {
+      const o = (ordersPool[fullCrit]||{})[date]||0;
+      const u = (unitsPool[fullCrit]||{})[date]||0;
+      if(o > 0) dp.push({date, orders:o, units:u});
+    });
+    if(!dp.length) return;
 
-    // Express: bypass urgency calc — use simple division of total pool
+    const totalO = dp.reduce((s,d)=>s+d.orders, 0);
+    const totalU = dp.reduce((s,d)=>s+d.units, 0);
+    const ppo    = totalO > 0 ? totalU/totalO : 1;
+
+    // SLA floor: minimum orders needed this wave to stay on pace
+    // Express handled separately
+    let slaFloorO = 0, slaFloorU = 0;
     if(isXp){
       if(EXPRESS1_BASES.has(base) || xpMode === 'clean'){
-        // EXPRESS1 always cleans; EXPRESS/EXOFFLINE clean if mode is clean
-        targetO = totalO;
-        targetU = totalU;
+        slaFloorO = totalO; slaFloorU = totalU;
       } else {
-        // Divide mode: EXPRESS and EXOFFLINE only
-        targetO = Math.ceil(totalO / xpN);
-        targetU = Math.ceil(totalU / xpN);
+        slaFloorO = Math.ceil(totalO / xpN);
+        slaFloorU = Math.ceil(totalU / xpN);
       }
+    } else {
+      // Per-date urgency sum = minimum to stay on pace
+      const earliestIdx = allDates.indexOf(allDates[0]);
+      dp.forEach(({date, orders, units}) => {
+        const dayOffset = allDates.indexOf(date) - earliestIdx;
+        const wavesAvail = Math.max(1, wavesLeft + (dayOffset * wavesPerDay));
+        slaFloorO += orders / wavesAvail;
+      });
+      slaFloorO = Math.ceil(slaFloorO);
+      slaFloorU = Math.ceil(slaFloorO * ppo);
     }
 
-    if(!targetO) return;
+    if(!slaFloorO && !totalO) return;
 
     candidates.push({
-      fullCrit, base, brand, isXp, ppo: ppo||1,
+      fullCrit, base, brand, isXp, ppo,
       pri: PRI[base]||10,
-      targetO, targetU,
+      slaFloorO, slaFloorU,   // guaranteed minimum
+      targetO: slaFloorO,     // will be updated by fill phase
+      targetU: slaFloorU,
       totalO, totalU,
-      dp, // sorted oldest first
+      dp,
     });
   });
 
-  if(!candidates.length){
-    alert('No eligible criteria found in pool.');
-    return;
-  }
+  if(!candidates.length){ alert('No eligible criteria found in pool.'); return; }
 
-  // ── SCALE TO HIT SELECTION CAP ───────────────────────────────────────
-  // Express targets are fixed. Scale non-express proportionally to fill
-  // remaining cap — but each criteria is capped at its own pool total.
-  // We iterate so criteria hitting their pool ceiling release budget
-  // to others that still have room.
-  const nonXp = candidates.filter(c => !c.isXp);
-  const xpCands = candidates.filter(c => c.isXp);
-  const xpUnits = xpCands.reduce((s,c) => s+c.targetU, 0);
-  let capRemaining = Math.max(0, capU - xpUnits);
+  // Express is already finalized — no fill phase needed for them
+  const xpCands  = candidates.filter(c => c.isXp);
+  const nonXp    = candidates.filter(c => !c.isXp);
+  const xpUnits  = xpCands.reduce((s,c) => s+c.targetU, 0);
+  let fillBudget = Math.max(0, capU - xpUnits);
 
-  if(nonXp.length > 0 && capRemaining > 0){
-    // Iterative proportional scaling — capped criteria release budget to others
-    let iterations = 0;
-    let scaled = nonXp.map(c => ({...c, scaled: false}));
+  // ── PHASE 1: SLA FLOOR ────────────────────────────────────────────────
+  // Deduct guaranteed minimums from budget first
+  const slaUnits = nonXp.reduce((s,c) => s+c.slaFloorU, 0);
+  fillBudget = Math.max(0, fillBudget - slaUnits);
 
-    while(iterations++ < 10){
-      const uncapped = scaled.filter(c => !c.scaled);
-      const uncappedTargetU = uncapped.reduce((s,c) => s+c.targetU, 0);
-      if(uncappedTargetU <= 0) break;
+  // ── PHASE 2: DATE-DRIVEN FILL ─────────────────────────────────────────
+  // With remaining budget, sweep through dates oldest→newest across ALL criteria.
+  // On each date, take orders proportionally from every criteria that has orders
+  // on that date — more orders on the date = more taken, naturally.
+  // Stop when budget is exhausted or all dates are consumed.
+  if(fillBudget > 0){
+    // Build a map of how many orders are ALREADY allocated (from SLA floor)
+    // so we know what's left in each criteria's date queue
+    const alreadyAllocated = {}; // fullCrit -> orders already committed
+    nonXp.forEach(c => { alreadyAllocated[c.fullCrit] = c.slaFloorO; });
 
-      const factor = capRemaining / uncappedTargetU;
-      let anyNewlyCapped = false;
+    // Get all unique dates across all non-express criteria, sorted oldest first
+    const allDatesSorted = [...new Set(
+      nonXp.flatMap(c => c.dp.map(d => d.date))
+    )].sort((a,b) => new Date(a)-new Date(b));
 
-      uncapped.forEach(c => {
-        const newTargetO = factor > 1
-          ? Math.min(Math.ceil(c.targetO * factor), c.totalO)
-          : Math.max(1, Math.floor(c.targetO * factor));
-        const newTargetU = factor > 1
-          ? Math.min(Math.ceil(c.targetU * factor), c.totalU)
-          : Math.floor(c.targetU * factor);
+    for(const date of allDatesSorted){
+      if(fillBudget <= 0) break;
 
-        if(factor > 1 && newTargetO >= c.totalO){
-          // Hit pool ceiling — mark as scaled, release its unit cost to others
-          c.targetO = c.totalO;
-          c.targetU = c.totalU;
-          c.scaled = true;
-          capRemaining -= c.totalU;
-          anyNewlyCapped = true;
-        } else {
-          c.targetO = newTargetO;
-          c.targetU = newTargetU;
-        }
+      // Find all criteria with orders on this date that haven't been fully allocated
+      const critOnDate = nonXp.filter(c => {
+        const dateEntry = c.dp.find(d => d.date === date);
+        if(!dateEntry) return false;
+        const alreadyFromThisDate = Math.max(0,
+          alreadyAllocated[c.fullCrit] - c.dp
+            .filter(d => new Date(d.date) < new Date(date))
+            .reduce((s,d) => s+d.orders, 0)
+        );
+        const remainingOnDate = dateEntry.orders - Math.min(alreadyFromThisDate, dateEntry.orders);
+        return remainingOnDate > 0 && c.targetO < c.totalO;
       });
 
-      if(!anyNewlyCapped) break; // stable — everyone scaled proportionally
-    }
+      if(!critOnDate.length) continue;
 
-    // Write scaled values back to candidates
-    scaled.forEach((sc, i) => {
-      const orig = nonXp[i];
-      orig.targetO = sc.targetO;
-      orig.targetU = sc.targetU;
-    });
+      // Total available orders on this date across eligible criteria
+      const totalOnDate = critOnDate.reduce((s,c) => {
+        const dateEntry = c.dp.find(d => d.date === date);
+        const alreadyFromThisDate = Math.max(0,
+          alreadyAllocated[c.fullCrit] - c.dp
+            .filter(d => new Date(d.date) < new Date(date))
+            .reduce((s2,d) => s2+d.orders, 0)
+        );
+        return s + Math.max(0, dateEntry.orders - Math.min(alreadyFromThisDate, dateEntry.orders));
+      }, 0);
+
+      // How many units would taking ALL of this date cost?
+      const avgPPO = critOnDate.reduce((s,c) => s+c.ppo, 0) / critOnDate.length;
+      const unitsForAllOnDate = totalOnDate * avgPPO;
+
+      if(unitsForAllOnDate <= fillBudget){
+        // We can take everything on this date — do it
+        critOnDate.forEach(c => {
+          const dateEntry = c.dp.find(d => d.date === date);
+          const alreadyFromThisDate = Math.max(0,
+            alreadyAllocated[c.fullCrit] - c.dp
+              .filter(d => new Date(d.date) < new Date(date))
+              .reduce((s,d) => s+d.orders, 0)
+          );
+          const take = Math.max(0, dateEntry.orders - Math.min(alreadyFromThisDate, dateEntry.orders));
+          const takeU = Math.round(take * c.ppo);
+          c.targetO = Math.min(c.totalO, c.targetO + take);
+          c.targetU = Math.min(c.totalU, c.targetU + takeU);
+          alreadyAllocated[c.fullCrit] += take;
+          fillBudget -= takeU;
+        });
+      } else {
+        // Budget runs out on this date — take proportionally from each criteria
+        const budgetFraction = fillBudget / unitsForAllOnDate;
+        critOnDate.forEach(c => {
+          const dateEntry = c.dp.find(d => d.date === date);
+          const alreadyFromThisDate = Math.max(0,
+            alreadyAllocated[c.fullCrit] - c.dp
+              .filter(d => new Date(d.date) < new Date(date))
+              .reduce((s,d) => s+d.orders, 0)
+          );
+          const available = Math.max(0, dateEntry.orders - Math.min(alreadyFromThisDate, dateEntry.orders));
+          const take = Math.min(available, Math.floor(available * budgetFraction));
+          const takeU = Math.round(take * c.ppo);
+          c.targetO = Math.min(c.totalO, c.targetO + take);
+          c.targetU = Math.min(c.totalU, c.targetU + takeU);
+          alreadyAllocated[c.fullCrit] += take;
+          fillBudget -= takeU;
+        });
+        break; // budget exhausted
+      }
+    }
   }
 
-  // Sort: express first, then by priority
+  // Sort: express first, then by SLA priority
   candidates.sort((a,b) => {
     if(a.isXp !== b.isXp) return a.isXp ? -1 : 1;
     return b.pri - a.pri;
