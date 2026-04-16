@@ -350,9 +350,6 @@ const EXPRESS1_BASES = new Set(['EXPRESS1']); // always clean, never divided
 const MIN_WARN_ORDERS = 10;
 const PRI = {
   'EXPRESS':90,'EXOFFLINE':85,
-  'SHOES':60,'OFFLINE5':55,'10PLUS':50,
-  'OFFLINE':45,'STND':40,'ESW':35,'GIFTMSG':35,'GOH':35,'OVNC':35,
-  'NORD':32,'APO':30,'MONO':25,'GIFTBOX':20,'QC':10,
 };
 const LINE3 = new Set(['POD25','POD26','POD27','POD29','POD30','POD32','POD33','POD34','POD35','POD36']);
 const LINE1_OVF = new Set(['POD01','POD02','POD07','POD08','POD10','POD11']);
@@ -769,9 +766,21 @@ function generateWave(){
 
   // Sort: express first, then by SLA priority
   candidates.sort((a,b) => {
-    if(a.isXp !== b.isXp) return a.isXp ? -1 : 1;
-    return b.pri - a.pri;
-  });
+  // Express always first
+  if (a.isXp !== b.isXp) return a.isXp ? -1 : 1;
+
+  // Get earliest remaining date for each
+  const aDate = a.dp?.[0]?.date;
+  const bDate = b.dp?.[0]?.date;
+
+  if (aDate && bDate) {
+    const diff = new Date(aDate) - new Date(bDate);
+    if (diff !== 0) return diff;
+  }
+
+  // Tie breaker (just to keep it stable)
+  return a.fullCrit.localeCompare(b.fullCrit);
+});
 
   // Snapshot pod remaining for pod space tab BEFORE planning
   const podCapSnapshot = {};
@@ -988,7 +997,22 @@ function generateWave(){
         .filter(r => !r.isXp)
         .map(r => ({r, cand: r._candRef, state: critDateState[r.fullCrit]}))
         .filter(x => x.cand && (x.cand.totalO - x.r.plannedO) > 0)
-        .sort((a,b) => (b.cand.pri||0) - (a.cand.pri||0));
+        .sort((a,b) => {
+  const aDate = a.state?.dateIdx != null && a.cand.dp[a.state.dateIdx]
+    ? a.cand.dp[a.state.dateIdx].date
+    : null;
+
+  const bDate = b.state?.dateIdx != null && b.cand.dp[b.state.dateIdx]
+    ? b.cand.dp[b.state.dateIdx].date
+    : null;
+
+  if (aDate && bDate) {
+    const diff = new Date(aDate) - new Date(bDate);
+    if (diff !== 0) return diff;
+  }
+
+  return a.r.fullCrit.localeCompare(b.r.fullCrit);
+});
 
       for(const x of topUp){
         if(budgetLeft <= 0) break;
