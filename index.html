@@ -345,11 +345,16 @@ const BASE_CRITERIA = [
   'OFFLINE1','OFFLINE5','OVNC','OVNC1','QC','SHOES','STND',
 ];
 // No singles exclusion — if a pod has it active, it gets planned
+// MULTI-wave exclusions: never planned regardless of pod config
+const MULTI_EXCLUDE = new Set(['SHOES','MONO','GOH1','OVNC1']);
 const EXPRESS_BASES = new Set(['EXPRESS','EXOFFLINE','EXPRESS1']);
 const EXPRESS1_BASES = new Set(['EXPRESS1']); // always clean, never divided
 const MIN_WARN_ORDERS = 10;
 const PRI = {
   'EXPRESS':90,'EXOFFLINE':85,
+  'SHOES':60,'OFFLINE5':55,'10PLUS':50,
+  'OFFLINE':45,'STND':40,'ESW':35,'GIFTMSG':35,'GOH':35,'OVNC':35,
+  'NORD':32,'APO':30,'MONO':25,'GIFTBOX':20,'QC':10,
 };
 const LINE3 = new Set(['POD25','POD26','POD27','POD29','POD30','POD32','POD33','POD34','POD35','POD36']);
 const LINE1_OVF = new Set(['POD01','POD02','POD07','POD08','POD10','POD11']);
@@ -467,7 +472,7 @@ function parsePoolCSV(text){
     pool[crit][date]=(pool[crit][date]||0)+val;
     dates.add(date);
   }
-  return{pool,dates:[...dates].sort((a,b)=>new Date(a)-new Date(b))};
+  return{pool,dates:[...dates].sort(dateSortFn)};
 }
 function parseChuteCSV(text){
   const lines=text.replace(/\r/g,'').split('\n').filter(l=>l.trim());
@@ -506,7 +511,7 @@ function loadPool(e,type){
       document.getElementById('zone-units').classList.add('loaded');
     }
     dates.forEach(d=>{if(!allDates.includes(d))allDates.push(d);});
-    allDates.sort((a,b)=>new Date(a)-new Date(b));
+    allDates.sort(dateSortFn);
     if(ordersPool&&unitsPool){
       buildSummary();buildPoolTable();
       document.getElementById('gen-btn').removeAttribute('disabled');
@@ -609,7 +614,7 @@ function calcUrgency(fullCrit, wavesLeft, wavesPerDay){
   });
 
   // Sort oldest first — physical pull always works from here
-  dp.sort((a,b) => new Date(a.date) - new Date(b.date));
+  dp.sort((a,b)=>dateSortFn(a.date,b.date));
 
   // Round up — always wave at least what's needed to stay on pace
   targetO = Math.ceil(targetO);
@@ -647,6 +652,7 @@ function generateWave(){
     const brand = fullCrit.startsWith('9-') ? '9' : '7';
     const base  = fullCrit.replace(/^[79]-/,'');
     if(brandFilter !== 'both' && brand !== brandFilter) return;
+    if(MULTI_EXCLUDE.has(base)) return; // never in multi waves
     const isXp = EXPRESS_BASES.has(base);
 
     // Build date plan — oldest first
@@ -720,7 +726,7 @@ function generateWave(){
     // Get all unique dates sorted oldest first
     const allDatesSorted = [...new Set(
       nonXp.flatMap(c => c.dp.map(d => d.date))
-    )].sort((a,b) => new Date(a)-new Date(b));
+    )].sort(dateSortFn);
 
     for(const date of allDatesSorted){
       if(fillBudget <= 0) break;
@@ -764,23 +770,15 @@ function generateWave(){
     }
   }
 
-  // Sort: express first, then by SLA priority
+  // Sort: express first, non-express by oldest date in their pool (most urgent first)
   candidates.sort((a,b) => {
-  // Express always first
-  if (a.isXp !== b.isXp) return a.isXp ? -1 : 1;
-
-  // Get earliest remaining date for each
-  const aDate = a.dp?.[0]?.date;
-  const bDate = b.dp?.[0]?.date;
-
-  if (aDate && bDate) {
-    const diff = new Date(aDate) - new Date(bDate);
-    if (diff !== 0) return diff;
-  }
-
-  // Tie breaker (just to keep it stable)
-  return a.fullCrit.localeCompare(b.fullCrit);
-});
+    if(a.isXp !== b.isXp) return a.isXp ? -1 : 1;
+    if(a.isXp && b.isXp) return 0; // express order doesn't matter
+    // Non-express: sort by oldest date with orders (most urgent first)
+    const aFirst = a.dp[0]?.date || '9/99';
+    const bFirst = b.dp[0]?.date || '9/99';
+    return dateSortFn(aFirst, bFirst);
+  });
 
   // Snapshot pod remaining for pod space tab BEFORE planning
   const podCapSnapshot = {};
@@ -803,7 +801,7 @@ function generateWave(){
 
   // ── POD ASSIGNMENT ──────────────────────────────────────────────────
   // High-PPO threshold: criteria above this get a dedicated overflow buffer pod
-  const HIGH_PPO = 4;
+  const HIGH_PPO = 6;
   const BUFFER_PCT = 0.10;
   const podBufferReserved = {};
 
@@ -935,7 +933,7 @@ function generateWave(){
     };
 
     // ── HIGH-PPO BUFFER POD ──────────────────────────────────────────
-    // If PPO > 4 and a used pod is at/near full, find one additional pod
+    // If PPO > 6 and a used pod is at/near full, find one additional pod
     // and reserve 10% of its cap for MAWM ghost split overflow.
     // The buffer pod is loaded normally with other criteria but stays 10% open.
     // Ghost reservation is NOT in totals or budget.
@@ -959,7 +957,7 @@ function generateWave(){
     const dateMap = {};
     res.allDatePlan.forEach(({date,orders}) => dateMap[date] = (dateMap[date]||0) + orders);
     const mergedDates = Object.entries(dateMap)
-      .sort((a,b) => new Date(a[0])-new Date(b[0]))
+      .sort((a,b)=>dateSortFn(a[0],b[0]))
       .map(([d,o]) => ({date:d,orders:o}));
 
     results.push({
@@ -981,69 +979,61 @@ function generateWave(){
     }
   });
 
-  // ── SECOND PASS: greedy top-up to hit cap ────────────────────────────
-  // Keep looping through non-express candidates with remaining pool orders,
-  // filling more into any pod that still has space, until budget is hit or
-  // all pods and pool orders are exhausted.
-  if(budgetLeft > 0){
-    let madeProgress = true;
-    let safetyLimit = 20; // max iterations to avoid infinite loop
+  // ── SECOND PASS: date-driven top-up ──────────────────────────────────
+  // After pod assignment, if budget remains, do another date sweep to fill gaps.
+  // Same logic as Phase 2 — oldest dates first, proportional by orders on date.
+  // No priority sorting — date availability is the only driver.
+  if(budgetLeft > 50){
+    const allDatesSorted2 = [...new Set(
+      results.filter(r => !r.isXp).flatMap(r => r._candRef?.dp.map(d=>d.date)||[])
+    )].sort(dateSortFn);
 
-    while(budgetLeft > 0 && madeProgress && safetyLimit-- > 0){
-      madeProgress = false;
+    for(const date of allDatesSorted2){
+      if(budgetLeft <= 0) break;
 
-      // Sort candidates by priority so highest urgency gets topped up first
-      const topUp = results
-        .filter(r => !r.isXp)
-        .map(r => ({r, cand: r._candRef, state: critDateState[r.fullCrit]}))
-        .filter(x => x.cand && (x.cand.totalO - x.r.plannedO) > 0)
-        .sort((a,b) => {
-  const aDate = a.state?.dateIdx != null && a.cand.dp[a.state.dateIdx]
-    ? a.cand.dp[a.state.dateIdx].date
-    : null;
+      const avail = results
+        .filter(r => !r.isXp && r._candRef)
+        .map(r => {
+          const cand = r._candRef;
+          const dateEntry = cand.dp.find(d => d.date === date);
+          if(!dateEntry) return null;
+          const canTake = cand.totalO - r.plannedO;
+          const a = Math.min(dateEntry.orders - Math.max(0, r.plannedO - cand.dp.filter(d=>dateSortFn(d.date,date)<0).reduce((s,d)=>s+d.orders,0)), canTake);
+          if(a <= 0) return null;
+          return {r, cand, avail: a};
+        }).filter(Boolean);
 
-  const bDate = b.state?.dateIdx != null && b.cand.dp[b.state.dateIdx]
-    ? b.cand.dp[b.state.dateIdx].date
-    : null;
+      if(!avail.length) continue;
 
-  if (aDate && bDate) {
-    const diff = new Date(aDate) - new Date(bDate);
-    if (diff !== 0) return diff;
-  }
+      const unitsIfAll = avail.reduce((s,x) => s + Math.round(x.avail * x.cand.ppo), 0);
+      if(unitsIfAll <= 0) continue;
 
-  return a.r.fullCrit.localeCompare(b.r.fullCrit);
-});
+      const takeAll = unitsIfAll <= budgetLeft;
+      const frac = takeAll ? 1 : budgetLeft / unitsIfAll;
 
-      for(const x of topUp){
+      for(const {r, cand, avail: a} of avail){
         if(budgetLeft <= 0) break;
-        const ordersLeft = x.cand.totalO - x.r.plannedO;
-        if(ordersLeft <= 0) continue;
-
-        // Try to add as many as budget allows — no fractional share, just fill
-        const maxByBudget = Math.floor(budgetLeft / x.cand.ppo);
-        const addO = Math.min(ordersLeft, maxByBudget);
+        const addO = takeAll ? a : Math.max(0, Math.floor(a * frac));
         if(addO <= 0) continue;
 
-        const state = x.state || {dateIdx:0, dateRem: x.cand.dp[0]?.orders||0};
-        const res = assignToPods(x.cand, addO, state.dateIdx, state.dateRem);
+        const state = critDateState[r.fullCrit] || {dateIdx:0, dateRem: cand.dp[0]?.orders||0};
+        const res = assignToPods(cand, addO, state.dateIdx, state.dateRem);
         if(!res || res.totalPlannedO <= 0) continue;
 
-        // Update date state for next iteration
-        critDateState[x.r.fullCrit] = {dateIdx: res.dateIdx, dateRem: res.dateRemaining};
-
-        x.r.plannedO += res.totalPlannedO;
-        x.r.plannedU += res.totalPlannedU;
-        res.usedPods.forEach(p => { if(!x.r.pods.includes(p)) x.r.pods.push(p); });
+        critDateState[r.fullCrit] = {dateIdx: res.dateIdx, dateRem: res.dateRemaining};
+        r.plannedO += res.totalPlannedO;
+        r.plannedU += res.totalPlannedU;
+        res.usedPods.forEach(p => { if(!r.pods.includes(p)) r.pods.push(p); });
 
         const dateMap = {};
-        [...x.r.datePlan, ...res.allDatePlan].forEach(({date,orders}) =>
-          dateMap[date] = (dateMap[date]||0) + orders);
-        x.r.datePlan = Object.entries(dateMap)
-          .sort((a,b) => new Date(a[0])-new Date(b[0]))
-          .map(([d,o]) => ({date:d,orders:o}));
-
-        madeProgress = true;
+        [...r.datePlan, ...res.allDatePlan].forEach(({date:d,orders:o}) =>
+          dateMap[d] = (dateMap[d]||0)+o);
+        r.datePlan = Object.entries(dateMap)
+          .sort((a,b)=>dateSortFn(a[0],b[0]))
+          .map(([d,o])=>({date:d,orders:o}));
       }
+
+      if(!takeAll) break;
     }
   }
 
@@ -1057,6 +1047,7 @@ function generateWave(){
     // Extract criteria name from warning string
     const crit = w.split(':')[0].trim();
     const base = crit.replace(/^[79]-/,'');
+    if(MULTI_EXCLUDE.has(base)) return false; // never flag excluded criteria
     // Check if it has today's date orders
     const todayOrders = (ordersPool[crit]||{})[earliestInPool]||0;
     if(todayOrders > 0) return true;
@@ -1334,8 +1325,15 @@ function buildPodSpace(){
   body.innerHTML = html;
 }
 
-// ── UTILS ────────────────────────────────────────────────────────────
-function fmtDate(d){if(!d)return '';const p=d.split('/');return p.length>=2?`${p[0]}/${p[1]}`:d;}
+// Parse a date string safely — handles 4/16/2026, 4/23/2026+, etc.
+function parseDate(d){
+  if(!d) return new Date(0);
+  const clean = d.replace(/\+$/,'').trim(); // strip trailing +
+  const parsed = new Date(clean);
+  return isNaN(parsed) ? new Date(0) : parsed;
+}
+function dateSortFn(a,b){ return parseDate(a)-parseDate(b); }
+function fmtDate(d){if(!d)return '';const p=d.replace(/\+$/,'').split('/');return p.length>=2?`${p[0]}/${p[1]}`:d;}
 function showTab(name){
   ['planner','pods','pool','podspace'].forEach((t,i)=>{
     document.getElementById(`tab-${t}`).style.display=t===name?'block':'none';
