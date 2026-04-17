@@ -357,7 +357,7 @@ const BASE_CRITERIA = [
 ];
 // No singles exclusion — if a pod has it active, it gets planned
 // MULTI-wave exclusions: never planned regardless of pod config
-const MULTI_EXCLUDE = new Set(['SHOES','MONO','GOH1','OVNC1','QC','GIFTBOX']);
+const MULTI_EXCLUDE = new Set(['SHOES','MONO','GOH1','OVNC1','QC','GIFTBOX','EOP']);
 const EXPRESS_BASES = new Set(['EXPRESS','EXOFFLINE','EXPRESS1']);
 const EXPRESS1_BASES = new Set(['EXPRESS1']); // always clean, never divided
 const MIN_WARN_ORDERS = 10;
@@ -818,7 +818,7 @@ function generateWave(){
 
   // ── POD ASSIGNMENT ──────────────────────────────────────────────────
   // High-PPO threshold: criteria above this get a dedicated overflow buffer pod
-  const HIGH_PPO = 4;
+  const HIGH_PPO = 6;
   const BUFFER_PCT = 0.10;
   const podBufferReserved = {};
 
@@ -950,7 +950,7 @@ function generateWave(){
     };
 
     // ── HIGH-PPO BUFFER POD ──────────────────────────────────────────
-    // If PPO > 4 and a used pod is at/near full, find one additional pod
+    // If PPO > 6 and a used pod is at/near full, find one additional pod
     // and reserve 10% of its cap for MAWM ghost split overflow.
     // The buffer pod is loaded normally with other criteria but stays 10% open.
     // Ghost reservation is NOT in totals or budget.
@@ -1058,16 +1058,17 @@ function generateWave(){
   results.forEach(r => delete r._candRef);
 
   // Compute critical warnings — only truly at-risk criteria
-  // A criteria is critical ONLY if its planned orders fall short of its SLA floor
-  // Pod-capacity warnings ("couldn't be placed") are NOT SLA risks if the planned amount covers the floor
+  // A criteria is critical ONLY if:
+  // 1. Its SLA floor > 0 (urgency math says it needs to move THIS wave to stay on pace)
+  // 2. Its planned orders fell short of that floor
+  // Criteria with slaFloor = 0 are not time-sensitive right now regardless of pod config
   const criticalWarnings = [];
   candidates.filter(c => !c.isXp && !MULTI_EXCLUDE.has(c.base)).forEach(cand => {
+    if(cand.slaFloorO <= 0) return; // not urgent this wave — skip
     const planned = results.find(r => r.fullCrit === cand.fullCrit);
     const plannedO = planned ? planned.plannedO : 0;
-    // Only critical if we planned fewer orders than the SLA floor demands
     if(plannedO < cand.slaFloorO){
       const shortfall = cand.slaFloorO - plannedO;
-      // Only surface if shortfall is meaningful (>= 1 order)
       if(shortfall >= 1){
         const reason = plannedO === 0 ? 'no active pod configured' : `${shortfall} orders short of SLA pace`;
         criticalWarnings.push(`${cand.fullCrit}: ${reason} (need ${cand.slaFloorO}, planned ${plannedO})`);
