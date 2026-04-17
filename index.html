@@ -687,23 +687,24 @@ function generateWave(){
 
     // SLA floor: minimum orders needed this wave to stay on pace
     // Express handled separately
-    let slaFloorO = 0, slaFloorU = 0;
+    let slaFloorO = 0, slaFloorU = 0, rawUrgency = 0;
     if(isXp){
       if(EXPRESS1_BASES.has(base) || xpMode === 'clean'){
-        slaFloorO = totalO; slaFloorU = totalU;
+        slaFloorO = totalO; slaFloorU = totalU; rawUrgency = totalO;
       } else {
         slaFloorO = Math.ceil(totalO / xpN);
         slaFloorU = Math.ceil(totalU / xpN);
+        rawUrgency = totalO / xpN;
       }
     } else {
       // Per-date urgency sum = minimum to stay on pace
       const earliestIdx = allDates.indexOf(allDates[0]);
-      dp.forEach(({date, orders, units}) => {
+      dp.forEach(({date, orders}) => {
         const dayOffset = allDates.indexOf(date) - earliestIdx;
         const wavesAvail = Math.max(1, wavesLeft + (dayOffset * wavesPerDay));
-        slaFloorO += orders / wavesAvail;
+        rawUrgency += orders / wavesAvail;
       });
-      slaFloorO = Math.ceil(slaFloorO);
+      slaFloorO = Math.ceil(rawUrgency);
       slaFloorU = Math.ceil(slaFloorO * ppo);
     }
 
@@ -712,8 +713,8 @@ function generateWave(){
     candidates.push({
       fullCrit, base, brand, isXp, ppo,
       pri: PRI[base]||10,
-      slaFloorO, slaFloorU,   // guaranteed minimum
-      targetO: slaFloorO,     // will be updated by fill phase
+      slaFloorO, slaFloorU, rawUrgency, // rawUrgency = unrounded, used for critical threshold
+      targetO: slaFloorO,
       targetU: slaFloorU,
       totalO, totalU,
       dp,
@@ -1059,12 +1060,12 @@ function generateWave(){
 
   // Compute critical warnings — only truly at-risk criteria
   // A criteria is critical ONLY if:
-  // 1. Its SLA floor > 0 (urgency math says it needs to move THIS wave to stay on pace)
-  // 2. Its planned orders fell short of that floor
-  // Criteria with slaFloor = 0 are not time-sensitive right now regardless of pod config
+  // 1. Raw urgency >= 1 (at least one full order genuinely needs to move THIS wave)
+  //    rawUrgency < 1 means orders are far enough out that skipping this wave is fine
+  // 2. Planned orders fell short of the SLA floor
   const criticalWarnings = [];
   candidates.filter(c => !c.isXp && !MULTI_EXCLUDE.has(c.base)).forEach(cand => {
-    if(cand.slaFloorO <= 0) return; // not urgent this wave — skip
+    if((cand.rawUrgency || 0) < 1) return; // not genuinely urgent this wave
     const planned = results.find(r => r.fullCrit === cand.fullCrit);
     const plannedO = planned ? planned.plannedO : 0;
     if(plannedO < cand.slaFloorO){
