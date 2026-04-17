@@ -66,9 +66,9 @@
   .stat-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px}
   .stat-value{font-family:var(--mono);font-size:20px;font-weight:500;color:var(--text)}
   .stat-sub{font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:2px}
-  .table-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 200px)}
+  .table-wrap{overflow-x:auto}
   table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
-  thead th{background:var(--surface);padding:8px 10px;text-align:right;color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 var(--border)}
+  thead th{background:var(--bg);padding:8px 10px;text-align:right;color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);white-space:nowrap}
   thead th:first-child{text-align:left}
   tbody tr{border-bottom:1px solid rgba(37,42,56,.5)}
   tbody tr:hover{background:rgba(255,255,255,.02)}
@@ -194,6 +194,7 @@
   <div class="tab active" onclick="showTab('planner')">Wave Planner</div>
   <div class="tab" onclick="showTab('pods')">Pod Manager</div>
   <div class="tab" onclick="showTab('pool')">Pool View</div>
+  <div class="tab" onclick="showTab('postwave')">Post-Wave Pool</div>
   <div class="tab" onclick="showTab('podspace')">Pod Space</div>
 </div>
 <div class="main">
@@ -311,6 +312,16 @@
       <div class="panel-title">Full Pool — Orders by Criteria &amp; Date</div>
       <div id="pool-tbl">
         <div class="empty-state"><div class="icon">📦</div><p>Upload both CSVs on the Wave Planner tab.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- POST-WAVE POOL -->
+  <div id="tab-postwave" style="display:none">
+    <div class="panel">
+      <div class="panel-title">Post-Wave Pool — Projected Remaining After This Wave</div>
+      <div id="postwave-tbl">
+        <div class="empty-state"><div class="icon">🔮</div><p>Generate a wave on the Wave Planner tab to see the projected remaining pool here.</p></div>
       </div>
     </div>
   </div>
@@ -807,7 +818,7 @@ function generateWave(){
 
   // ── POD ASSIGNMENT ──────────────────────────────────────────────────
   // High-PPO threshold: criteria above this get a dedicated overflow buffer pod
-  const HIGH_PPO = 6;
+  const HIGH_PPO = 4;
   const BUFFER_PCT = 0.10;
   const podBufferReserved = {};
 
@@ -939,7 +950,7 @@ function generateWave(){
     };
 
     // ── HIGH-PPO BUFFER POD ──────────────────────────────────────────
-    // If PPO > 6 and a used pod is at/near full, find one additional pod
+    // If PPO > 4 and a used pod is at/near full, find one additional pod
     // and reserve 10% of its cap for MAWM ghost split overflow.
     // The buffer pod is loaded normally with other criteria but stays 10% open.
     // Ghost reservation is NOT in totals or budget.
@@ -1046,20 +1057,22 @@ function generateWave(){
   // Clean up internal reference before render
   results.forEach(r => delete r._candRef);
 
-  // Compute critical warnings — criteria that MUST wave to stay under SLA
-  // Critical = has orders due today (earliest date in pool) OR urgency >= 1 order per wave
-  const earliestInPool = allDates[0];
-  const criticalWarnings = warnings.filter(w => {
-    // Extract criteria name from warning string
-    const crit = w.split(':')[0].trim();
-    const base = crit.replace(/^[79]-/,'');
-    if(MULTI_EXCLUDE.has(base)) return false; // never flag excluded criteria
-    // Check if it has today's date orders
-    const todayOrders = (ordersPool[crit]||{})[earliestInPool]||0;
-    if(todayOrders > 0) return true;
-    // Check urgency >= 1 (has to move at least 1 order this wave to stay clean)
-    const {targetO} = calcUrgency(crit, wavesLeft, wavesPerDay);
-    return targetO >= 1;
+  // Compute critical warnings — only truly at-risk criteria
+  // A criteria is critical ONLY if its planned orders fall short of its SLA floor
+  // Pod-capacity warnings ("couldn't be placed") are NOT SLA risks if the planned amount covers the floor
+  const criticalWarnings = [];
+  candidates.filter(c => !c.isXp && !MULTI_EXCLUDE.has(c.base)).forEach(cand => {
+    const planned = results.find(r => r.fullCrit === cand.fullCrit);
+    const plannedO = planned ? planned.plannedO : 0;
+    // Only critical if we planned fewer orders than the SLA floor demands
+    if(plannedO < cand.slaFloorO){
+      const shortfall = cand.slaFloorO - plannedO;
+      // Only surface if shortfall is meaningful (>= 1 order)
+      if(shortfall >= 1){
+        const reason = plannedO === 0 ? 'no active pod configured' : `${shortfall} orders short of SLA pace`;
+        criticalWarnings.push(`${cand.fullCrit}: ${reason} (need ${cand.slaFloorO}, planned ${plannedO})`);
+      }
+    }
   });
 
   // Snapshot pod usage for pod space tab
@@ -1286,7 +1299,95 @@ function resetPods(){
   savePodConfig();closeModal();buildPodGrid();
 }
 
-// ── POD SPACE TAB ────────────────────────────────────────────────────
+// ── POST-WAVE POOL ───────────────────────────────────────────────────
+function buildPostWavePool(){
+  const body = document.getElementById('postwave-tbl');
+  if(!lastWaveResults || !ordersPool || !unitsPool){
+    body.innerHTML = `<div class="empty-state"><div class="icon">🔮</div><p>Generate a wave on the Wave Planner tab to see the projected remaining pool here.</p></div>`;
+    return;
+  }
+
+  // Build a map of planned orders per criteria (from last wave)
+  const plannedMap = {};
+  lastWaveResults.forEach(r => {
+    plannedMap[r.fullCrit] = (plannedMap[r.fullCrit]||0) + r.plannedO;
+  });
+
+  // For each criteria, subtract planned orders from oldest dates first
+  const remaining = {};
+  Object.keys(ordersPool).forEach(fullCrit => {
+    const poolByDate = ordersPool[fullCrit] || {};
+    let toSubtract = plannedMap[fullCrit] || 0;
+    remaining[fullCrit] = {};
+    // Work through dates oldest first
+    const sortedDates = Object.keys(poolByDate).sort(dateSortFn);
+    sortedDates.forEach(date => {
+      const poolOrders = poolByDate[date] || 0;
+      if(toSubtract <= 0){
+        remaining[fullCrit][date] = poolOrders;
+      } else {
+        const take = Math.min(poolOrders, toSubtract);
+        remaining[fullCrit][date] = poolOrders - take;
+        toSubtract -= take;
+      }
+    });
+  });
+
+  // Build table — same format as pool view, same date columns
+  const cols = allDates.slice(0, 8);
+  const criteria = Object.keys(ordersPool).sort((a,b) => {
+    const baseA=a.replace(/^[79]-/,''), baseB=b.replace(/^[79]-/,'');
+    const isXpA=EXPRESS_BASES.has(baseA)?0:1, isXpB=EXPRESS_BASES.has(baseB)?0:1;
+    if(isXpA!==isXpB) return isXpA-isXpB;
+    if(baseA!==baseB) return baseA.localeCompare(baseB);
+    return a.startsWith('7-')?-1:1;
+  });
+
+  let html = `<div class="table-wrap"><table><thead><tr>
+    <th>Criteria</th>${cols.map(d=>`<th>${fmtDate(d)}</th>`).join('')}
+    <th>Remaining Ord</th><th>Original Ord</th><th>Waved</th>
+  </tr></thead><tbody>`;
+
+  let gRemaining=0, gOriginal=0, gWaved=0;
+  criteria.forEach(c => {
+    const brand = c.startsWith('9-')?'9':'7';
+    const remRow = remaining[c] || {};
+    const origRow = ordersPool[c] || {};
+    const tOrig = Object.values(origRow).reduce((a,b)=>a+b,0);
+    const tRem  = Object.values(remRow).reduce((a,b)=>a+b,0);
+    const tWaved = tOrig - tRem;
+    gOriginal += tOrig; gRemaining += tRem; gWaved += tWaved;
+
+    const rowClass = tRem === 0 ? 'style="opacity:.45"' : '';
+    html += `<tr ${rowClass}><td><span class="brand-dot c${brand}"></span>${c}</td>`;
+    html += cols.map(d => {
+      const v = remRow[d]||0;
+      const orig = origRow[d]||0;
+      const waved = orig - v;
+      let style = '';
+      if(v === 0 && orig > 0) style = 'color:var(--accent)'; // fully cleared
+      else if(waved > 0) style = 'color:var(--accent2)';     // partially cleared
+      return `<td class="${v?'num-pos':'num-zero'}" style="${style}">${v?v.toLocaleString():'—'}</td>`;
+    }).join('');
+    html += `<td class="${tRem?'num-pos':'num-zero'}" style="${tRem===0?'color:var(--accent)':''}">${tRem.toLocaleString()}</td>`;
+    html += `<td style="color:var(--text3)">${tOrig.toLocaleString()}</td>`;
+    html += `<td style="color:var(--accent2)">${tWaved>0?'+'+tWaved.toLocaleString():'—'}</td></tr>`;
+  });
+
+  html += `<tr class="total-row">
+    <td>TOTAL</td>
+    ${cols.map(d=>{
+      const v=Object.values(remaining).reduce((s,r)=>s+(r[d]||0),0);
+      return `<td>${v?v.toLocaleString():'—'}</td>`;
+    }).join('')}
+    <td>${gRemaining.toLocaleString()}</td>
+    <td style="color:var(--text3)">${gOriginal.toLocaleString()}</td>
+    <td style="color:var(--accent2)">+${gWaved.toLocaleString()}</td>
+  </tr>`;
+
+  html += '</tbody></table></div>';
+  body.innerHTML = html;
+}
 function buildPodSpace(){
   const body = document.getElementById('podspace-body');
   if(!lastPodLeft || !lastPodConfig){
@@ -1341,12 +1442,13 @@ function parseDate(d){
 function dateSortFn(a,b){ return parseDate(a)-parseDate(b); }
 function fmtDate(d){if(!d)return '';const p=d.replace(/\+$/,'').split('/');return p.length>=2?`${p[0]}/${p[1]}`:d;}
 function showTab(name){
-  ['planner','pods','pool','podspace'].forEach((t,i)=>{
+  ['planner','pods','pool','postwave','podspace'].forEach((t,i)=>{
     document.getElementById(`tab-${t}`).style.display=t===name?'block':'none';
     document.querySelectorAll('.tab')[i].className='tab'+(t===name?' active':'');
   });
   if(name==='pods') buildPodGrid();
   if(name==='podspace') buildPodSpace();
+  if(name==='postwave') buildPostWavePool();
 }
 buildPodGrid();
 </script>
