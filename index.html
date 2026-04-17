@@ -341,12 +341,12 @@
 // ── CONSTANTS ────────────────────────────────────────────────────────
 const BASE_CRITERIA = [
   '10PLUS','APO','ESW','EXOFFLINE','EXPRESS','EXPRESS1',
-  'GIFTBOX','GIFTMSG','GOH','GOH1','MONO','NORD','OFFLINE',
-  'OFFLINE1','OFFLINE5','OVNC','OVNC1','QC','SHOES','STND',
+  'GIFTMSG','GOH','NORD','OFFLINE','OFFLINE1','OFFLINE5',
+  'OVNC','STND',
 ];
 // No singles exclusion — if a pod has it active, it gets planned
 // MULTI-wave exclusions: never planned regardless of pod config
-const MULTI_EXCLUDE = new Set(['SHOES','MONO','GOH1','OVNC1']);
+const MULTI_EXCLUDE = new Set(['SHOES','MONO','GOH1','OVNC1','QC','GIFTBOX']);
 const EXPRESS_BASES = new Set(['EXPRESS','EXOFFLINE','EXPRESS1']);
 const EXPRESS1_BASES = new Set(['EXPRESS1']); // always clean, never divided
 const MIN_WARN_ORDERS = 10;
