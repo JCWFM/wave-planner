@@ -68,7 +68,7 @@
   .stat-sub{font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:2px}
   .table-wrap{overflow-x:auto}
   table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
-  thead th{background:var(--bg);padding:8px 10px;text-align:right;color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);white-space:nowrap}
+  thead th{background:var(--bg);padding:8px 10px;text-align:right;color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:112px;z-index:10}
   thead th:first-child{text-align:left}
   tbody tr{border-bottom:1px solid rgba(37,42,56,.5)}
   tbody tr:hover{background:rgba(255,255,255,.02)}
@@ -561,8 +561,13 @@ function buildSummary(){
 function buildPoolTable(){
   const cols=allDates.slice(0,8);
   const criteria=Object.keys(ordersPool).sort((a,b)=>{
-    const sa=a.replace(/^[79]-/,''),sb=b.replace(/^[79]-/,'');
-    return (PRI[sb]||0)-(PRI[sa]||0)||a.localeCompare(b);
+    const baseA=a.replace(/^[79]-/,''), baseB=b.replace(/^[79]-/,'');
+    const brandA=a.startsWith('9-')?1:0, brandB=b.startsWith('9-')?1:0;
+    const isXpA=EXPRESS_BASES.has(baseA)?0:1, isXpB=EXPRESS_BASES.has(baseB)?0:1;
+    // Express before non-express, then by brand (7 before 9), then alphabetical
+    if(isXpA!==isXpB) return isXpA-isXpB;
+    if(brandA!==brandB) return brandA-brandB;
+    return baseA.localeCompare(baseB);
   });
   let html=`<div class="table-wrap"><table><thead><tr><th>Criteria</th>${cols.map(d=>`<th>${fmtDate(d)}</th>`).join('')}<th>Total Ord</th><th>Total Units</th><th>PPO</th></tr></thead><tbody>`;
   let gO=0,gU=0;
