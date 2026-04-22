@@ -819,7 +819,7 @@ function generateWave(){
 
   // ── POD ASSIGNMENT ──────────────────────────────────────────────────
   // High-PPO threshold: criteria above this get a dedicated overflow buffer pod
-  const HIGH_PPO = 6;
+  const HIGH_PPO = 4;
   const BUFFER_PCT = 0.10;
   const podBufferReserved = {};
 
@@ -827,34 +827,50 @@ function generateWave(){
   const warnings = [];
   let budgetLeft = capU;
 
-  // Helper: get eligible pods for a candidate, sorted by line preference
+  // Pod number extractor
+  const podNum = pod => parseInt(pod.replace(/\D/g,''));
+
+  // Helper: get eligible pods for a candidate, sorted by fill preference
+  // For L3L1_SET criteria:
+  //   1. Line 3 pods first, highest number → lowest (POD36 → POD25), exhausted before Line 1
+  //   2. Then Line 1 overflow pods
+  //   3. Then everything else
+  // Within each group: partially-used pods before empty, then by cap descending
   function getEligPods(cand, excludePods){
     const excl = excludePods || new Set();
     return Object.entries(podConfig).filter(([pod,cfg]) => {
       if(!cfg.active || !podLeft[pod] || podLeft[pod].orders <= 0) return false;
       if(excl.has(pod)) return false;
       if(!cfg.criteria.includes(cand.base)) return false;
-      // Brand eligibility check
       if(cfg.brand === 'apo') return true;
       if(cfg.brand === '7') return cand.brand === '7';
       if(cfg.brand === '9') return cand.brand === '9';
       if(cfg.brand === 'both'){
-        // If this pod is already committed to a brand this wave, only that brand can use it
         if(podCommitted[pod]) return podCommitted[pod] === cand.brand;
-        // Not yet committed — available for either brand
         return true;
       }
       return false;
     }).sort((a,b) => {
-      if(L3L1_SET.has(cand.base)){
-        const aL3=LINE3.has(a[0]),bL3=LINE3.has(b[0]);
-        const aL1=LINE1_OVF.has(a[0]),bL1=LINE1_OVF.has(b[0]);
-        if(aL3&&!bL3) return -1; if(!aL3&&bL3) return 1;
-        if(aL1&&!bL1) return 1;  if(!aL1&&bL1) return -1;
+      const isL3Crit = L3L1_SET.has(cand.base);
+      if(isL3Crit){
+        const aL3 = LINE3.has(a[0]), bL3 = LINE3.has(b[0]);
+        const aL1 = LINE1_OVF.has(a[0]), bL1 = LINE1_OVF.has(b[0]);
+        // Line 3 always before Line 1 and everything else
+        if(aL3 && !bL3) return -1;
+        if(!aL3 && bL3) return 1;
+        // Line 1 overflow always after Line 3 but before other pods
+        if(aL1 && !bL1) return 1;
+        if(!aL1 && bL1) return -1;
+        // Within Line 3: fill highest pod number first (36 → 25)
+        if(aL3 && bL3) return podNum(b[0]) - podNum(a[0]);
+        // Within Line 1 overflow: fill lowest pod number first
+        if(aL1 && bL1) return podNum(a[0]) - podNum(b[0]);
       }
-      const aU=podLeft[a[0]].orders<podLeft[a[0]].original;
-      const bU=podLeft[b[0]].orders<podLeft[b[0]].original;
-      if(aU&&!bU) return -1; if(!aU&&bU) return 1;
+      // For all other pods / criteria: partially-used first, then by cap descending
+      const aUsed = podLeft[a[0]].orders < podLeft[a[0]].original;
+      const bUsed = podLeft[b[0]].orders < podLeft[b[0]].original;
+      if(aUsed && !bUsed) return -1;
+      if(!aUsed && bUsed) return 1;
       return podLeft[b[0]].orders - podLeft[a[0]].orders;
     });
   }
