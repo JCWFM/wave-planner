@@ -100,7 +100,6 @@
   .pod-tagX{background:rgba(240,160,74,.12);color:var(--accent2);border:1px solid rgba(240,160,74,.3)}
   .pod-tagM{background:rgba(255,255,255,.06);color:var(--text2);border:1px solid var(--border)}
   .pod-tagB{background:rgba(74,240,160,.08);color:var(--accent);border:1px solid rgba(74,240,160,.25);font-style:italic}
-  .pod-tagF{background:rgba(74,159,240,.06);color:var(--text3);border:1px solid rgba(74,159,240,.2);font-style:italic}
   .totals-bar{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;gap:28px;align-items:center;flex-wrap:wrap;margin-top:14px}
   .ti .tl{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px}
   .ti .tv{font-family:var(--mono);font-size:18px;font-weight:500;color:var(--accent)}
@@ -1056,28 +1055,8 @@ function generateWave(){
     }
   });
 
-  // ── FALLBACK POD SHARING ──────────────────────────────────────────────
-  // If a criteria ends up with only one pod assigned, find other criteria
-  // sharing that same pod this wave and add their pods as fallbacks.
-  // This gives MAWM options so it doesn't cancel orders when pods compete.
-  // Fallback pods are shown in the output but NOT counted in planned totals.
-  results.forEach(r => {
-    if(r.pods.length !== 1) return; // only applies to single-pod assignments
-    const soloP = r.pods[0];
-    // Find all other results using this same pod
-    const podMates = results.filter(other =>
-      other !== r && !other.isXp && other.pods.includes(soloP)
-    );
-    if(!podMates.length) return;
-    // Collect all pods from pod-mates, excluding the one already assigned
-    const fallbacks = [...new Set(
-      podMates.flatMap(pm => pm.pods).filter(p => p !== soloP)
-    )].sort((a,b) => podNum(a) - podNum(b));
-    if(fallbacks.length) r.fallbackPods = fallbacks;
-  });
+  // ── SECOND PASS: keep filling until cap is hit or pool/pods exhausted ────
   // Runs multiple sweeps oldest-date-first until:
-  //   (a) budgetLeft <= 0  — cap reached
-  //   (b) a full sweep placed nothing new — pool or pods genuinely exhausted
   if(budgetLeft > 0){
     let sweepsMadeProgress = true;
     let sweepLimit = 10;
@@ -1238,9 +1217,6 @@ function wRow(r){
   const bufferTag = r.bufferPod
     ? `<span class="pod-tag pod-tagB" title="Buffer pod — keep 10% open for MAWM splits">${r.bufferPod} ⟳</span>`
     : '';
-  const fallbackTags = (r.fallbackPods||[])
-    .map(p => `<span class="pod-tag pod-tagF" title="Fallback pod — MAWM backup if primary is contested">${p} ↩</span>`)
-    .join('');
 
   const dates = r.datePlan;
   let dateStr = '';
@@ -1255,7 +1231,7 @@ function wRow(r){
     </div>
     <div class="wo">${r.plannedO.toLocaleString()} <span>ord · ${r.plannedU.toLocaleString()} units</span></div>
     <div class="wd">${dateStr}</div>
-    <div class="wpods">${podTags}${bufferTag}${fallbackTags}</div>
+    <div class="wpods">${podTags}${bufferTag}</div>
   </div>`;
 }
 
