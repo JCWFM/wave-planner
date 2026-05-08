@@ -951,14 +951,25 @@ function generateWave(){
       // Guard: if actual units exceed remaining budget, we need to back off
       // This can happen because maxByBudget used blended PPO as estimate
       if(actualU > budgetLeft){
-        // Recalculate how many orders we can actually afford
-        const affordableO = Math.floor(budgetLeft / (actualU / actual));
-        if(affordableO <= 0) continue;
-        // Re-pull from date queue with reduced count — use proportional units
-        actualU = Math.round(affordableO * (actualU / actual));
-        // Adjust pod and date tracking accordingly
-        // (simplified: just cap units at budgetLeft)
-        actualU = Math.min(actualU, budgetLeft);
+        // Scale down proportionally — keep orders and units in sync
+        const ratio = budgetLeft / actualU;
+        const affordableO = Math.max(1, Math.round(actual * ratio));
+        const affordableU = Math.min(budgetLeft, Math.round(actualU * ratio));
+        if(affordableU <= 0) continue;
+        // Reduce actual and actualU together so they stay in sync
+        actualU = affordableU;
+        // Adjust ordersRemaining to reflect the actual reduction
+        ordersRemaining += (actual - affordableO);
+        // (actual itself used below only for pLeft adjustment, recalc inline)
+        pLeft.orders = Math.max(0, pLeft.orders - (effectiveCap - (ordersRemaining + affordableO)));
+        budgetLeft -= actualU;
+        // Skip the second pLeft.orders update below by adjusting carefully
+        ordersRemaining -= affordableO;
+        totalPlannedO += affordableO;
+        totalPlannedU += actualU;
+        usedPods.push(podName);
+        allDatePlan.push(...datePlan);
+        continue; // skip the normal commit below
       }
 
       // Commit "both" pod to this criteria's brand on first use
@@ -1236,6 +1247,48 @@ function generateWave(){
       }
     }
   });
+
+// ── THIRD PASS: spend any budget returned by the over-commitment trim ──
+  // The trim may have returned units to budgetLeft. Run one more sweep to spend it.
+  if(budgetLeft > 50){
+    const allDatesSorted3 = [...new Set(
+      results.filter(r => !r.isXp && r._candRef === undefined)
+             .flatMap(r => {
+               const cand = candidates.find(c => c.fullCrit === r.fullCrit);
+               return cand ? cand.dp.map(d => d.date) : [];
+             })
+    )].sort(dateSortFn);
+
+    for(const date of allDatesSorted3){
+      if(budgetLeft <= 0) break;
+      for(const r of results.filter(x => !x.isXp)){
+        if(budgetLeft <= 0) break;
+        const cand = candidates.find(c => c.fullCrit === r.fullCrit);
+        if(!cand) continue;
+        const canTakeMore = cand.totalO - r.plannedO;
+        if(canTakeMore <= 0) continue;
+        const dateEntry = cand.dp.find(d => d.date === date);
+        if(!dateEntry || !dateEntry.orders) continue;
+        const addO = Math.min(canTakeMore,
+          Math.ceil(budgetLeft / Math.max(cand.ppo, 0.1)));
+        if(addO <= 0) continue;
+        const state = critDateState[r.fullCrit] || {dateIdx:0, dateRem: cand.dp[0]?.orders||0};
+        const res3 = assignToPods(cand, addO, state.dateIdx, state.dateRem);
+        if(!res3 || res3.totalPlannedO <= 0) continue;
+        critDateState[r.fullCrit] = {dateIdx: res3.dateIdx, dateRem: res3.dateRemaining};
+        r.plannedO += res3.totalPlannedO;
+        r.plannedU += res3.totalPlannedU;
+        res3.usedPods.forEach(p => { if(!r.pods.includes(p)) r.pods.push(p); });
+        const dateMap3 = {};
+        [...r.datePlan, ...res3.allDatePlan].forEach(({date:d,orders:o}) =>
+          dateMap3[d] = (dateMap3[d]||0)+o);
+        r.datePlan = Object.entries(dateMap3)
+          .sort((a,b) => dateSortFn(a[0],b[0]))
+          .map(([d,o]) => ({date:d,orders:o}));
+      }
+    }
+  }
+  
   // A criteria is critical ONLY if:
   // 1. Raw urgency >= 1 (at least one full order genuinely needs to move THIS wave)
   //    rawUrgency < 1 means orders are far enough out that skipping this wave is fine
