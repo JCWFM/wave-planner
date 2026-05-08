@@ -1128,7 +1128,114 @@ function generateWave(){
   // Clean up internal reference before render
   results.forEach(r => delete r._candRef);
 
-  // Compute critical warnings — only truly at-risk criteria
+  // ── POD OVER-COMMITMENT RESOLUTION ───────────────────────────────────
+  // After all planning: check every pod for over-commitment.
+  // If total planned orders across all criteria going to a pod exceeds its cap,
+  // MAWM might fill it entirely with one criteria and kick the others.
+  // Fix: for each over-committed pod, either find a backup pod for at-risk criteria
+  // OR trim the lowest-urgency criteria on that pod to bring total under cap.
+  // Cap is a FLOOR — we must not go under capU overall. Slight overage is fine.
+
+  // Build pod → [results using it] map
+  const podToResults = {};
+  results.forEach(r => {
+    r.pods.forEach(p => {
+      if(!podToResults[p]) podToResults[p] = [];
+      podToResults[p].push(r);
+    });
+  });
+
+  Object.entries(podToResults).forEach(([pod, podResults]) => {
+    if(podResults.length <= 1) return; // only one criteria — no contention
+    const podCap = podConfig[pod]?.capOverride != null
+      ? podConfig[pod].capOverride
+      : (podConfig[pod]?.orders || 0);
+    if(podCap <= 0) return;
+
+    // Total orders planned to this pod from all criteria
+    // Estimate each criteria's share going to this specific pod
+    const shares = podResults.map(r => {
+      const podCount = r.pods.length;
+      // Rough share: planned orders / number of pods (even distribution estimate)
+      const share = Math.ceil(r.plannedO / podCount);
+      return {r, share};
+    });
+    const totalToThisPod = shares.reduce((s,x) => s + x.share, 0);
+    if(totalToThisPod <= podCap) return; // under cap — no issue
+
+    // Over-committed. Sort by urgency ascending (lowest urgency = trim first)
+    // Urgency = rawUrgency from candidate, or 0 if not found
+    const withUrgency = shares.map(x => {
+      const cand = candidates.find(c => c.fullCrit === x.r.fullCrit);
+      return {...x, urgency: cand?.rawUrgency || 0, cand};
+    }).sort((a,b) => a.urgency - b.urgency);
+
+    let overflow = totalToThisPod - podCap;
+
+    for(const item of withUrgency){
+      if(overflow <= 0) break;
+
+      // Try to find a backup pod for this criteria first
+      // A backup pod is one that:
+      // - is active and has the criteria's base in its criteria list
+      // - is not already in this criteria's pod list
+      // - is not over-committed itself
+      const existingPods = new Set(item.r.pods);
+      const backupCandidates = Object.entries(podConfig).filter(([bp, cfg]) => {
+        if(!cfg.active || existingPods.has(bp)) return false;
+        if(!cfg.criteria.includes(item.r.base)) return false;
+        if(cfg.brand === '7' && item.r.brand !== '7') return false;
+        if(cfg.brand === '9' && item.r.brand !== '9') return false;
+        if(cfg.brand === 'both'){
+          // check commitment
+          // allow if uncommitted or committed to this brand
+        }
+        const bpCap = cfg.capOverride != null ? cfg.capOverride : cfg.orders;
+        if(bpCap <= 0) return false;
+        // Check if this backup pod is itself over-committed
+        const bpTotal = (podToResults[bp] || []).reduce((s,r2) => {
+          return s + Math.ceil(r2.plannedO / r2.pods.length);
+        }, 0);
+        return bpTotal < bpCap; // only use if it has genuine space
+      });
+
+      if(backupCandidates.length > 0){
+        // Add the best backup pod (most remaining space, same line preference)
+        backupCandidates.sort((a,b) => {
+          const aCap = (a[1].capOverride != null ? a[1].capOverride : a[1].orders);
+          const bCap = (b[1].capOverride != null ? b[1].capOverride : b[1].orders);
+          const aUsed = (podToResults[a[0]]||[]).reduce((s,r2)=>s+Math.ceil(r2.plannedO/r2.pods.length),0);
+          const bUsed = (podToResults[b[0]]||[]).reduce((s,r2)=>s+Math.ceil(r2.plannedO/r2.pods.length),0);
+          return (aCap - aUsed) - (bCap - bUsed); // most space last (we want most space first)
+        }).reverse();
+        const [backupPod] = backupCandidates[0];
+        if(!item.r.pods.includes(backupPod)){
+          item.r.pods.push(backupPod);
+          // Sort pods numerically
+          item.r.pods.sort((a,b) => podNum(a) - podNum(b));
+          // Update podToResults for the new pod
+          if(!podToResults[backupPod]) podToResults[backupPod] = [];
+          podToResults[backupPod].push(item.r);
+          // Reduce overflow estimate
+          overflow -= item.share;
+        }
+      } else {
+        // No backup pod available — trim this criteria's orders if not SLA critical
+        const isCritical = (item.cand?.rawUrgency || 0) >= 1 &&
+          item.r.plannedO <= (item.cand?.slaFloorO || 0);
+        if(!isCritical && overflow > 0){
+          const trimO = Math.min(overflow, item.r.plannedO - 1);
+          if(trimO > 0){
+            const trimU = Math.round(trimO * item.r.ppo);
+            item.r.plannedO -= trimO;
+            item.r.plannedU -= trimU;
+            budgetLeft += trimU; // return budget so other criteria can use it
+            overflow -= trimO;
+          }
+        }
+      }
+    }
+  });
   // A criteria is critical ONLY if:
   // 1. Raw urgency >= 1 (at least one full order genuinely needs to move THIS wave)
   //    rawUrgency < 1 means orders are far enough out that skipping this wave is fine
